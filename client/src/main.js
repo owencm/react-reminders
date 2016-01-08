@@ -17,9 +17,21 @@ import AddIcon from 'material-ui/lib/svg-icons/content/add';
 import injectTapEventPlugin from 'react-tap-event-plugin';
 injectTapEventPlugin();
 
-import model from './model.js';
+import serviceWorkerSetup from './service-worker-setup.js';
+serviceWorkerSetup();
+import push from './push.js';
+push.init();
+// The initialization hasn't completed so knowing how to subscribe immediately is a pain
 
+import model from './model.js';
+model.init();
+import scheduleManager from './schedule-manager.js';
+model.addListener(scheduleManager);
 import strings from './strings.js';
+import { getDeviceId } from './lib/device-id.js';
+getDeviceId().then((id) => {
+  console.log(id);
+});
 
 let handleDoneClicked = (todo) => {
   model.markDone(todo.id);
@@ -30,14 +42,18 @@ let handleCreateClicked = () => {
   // Blame react's event system.
   setTimeout(() => {
     let title = prompt('What do you aspire to do more often?');
-    if (title === '') {
+    if (title === '' || title === undefined || title === null) {
       return;
     }
     let frequency = parseInt(prompt('How many days would you like to wait between doing it?'));
-    if (isNaN(frequency)) {
+    if (isNaN(frequency) || frequency === undefined || frequency === null) {
       return;
     }
     model.addTodo(title, frequency);
+    // TODO: dim the screen at this point
+    push.subscribeDevice().then(() => {
+      console.log('Subscribed for notifications successfully!');
+    });
   }, 0);
 }
 
@@ -49,7 +65,7 @@ let App = (props) => {
         showMenuIconButton={false}
       />
       <TodoList
-        subheader="Don't forget to..."
+        subheader="It's time to..."
         todos={props.dueTodos}
         onDoneClick={handleDoneClicked}
       />
@@ -67,7 +83,7 @@ let App = (props) => {
   );
 };
 
-let render = (dueTodos, futureTodos) => {
+let render = (todos, dueTodos, futureTodos) => {
   ReactDOM.render(
     <App dueTodos={dueTodos} futureTodos={futureTodos}/>,
     document.getElementById('content')

@@ -5,12 +5,21 @@ const babelify = require('babelify');
 const source = require('vinyl-source-stream');
 
 gulp.task('default', function () {
+  // Build main app
   browserify({entries: 'src/main.js'})
     .transform(babelify, { presets: ['react','es2015'] })
     .bundle()
     .pipe(source('main.js'))
     .pipe(gulp.dest('build'));
-  return gulp.src('src/*.html').pipe(gulp.dest('build'));
+
+  // Build service worker
+  browserify({entries: 'src/service-worker.js'})
+    .transform(babelify, { presets: ['es2015'] })
+    .bundle()
+    .pipe(source('service-worker.js'))
+    .pipe(gulp.dest('build'));
+
+  return gulp.src(['src/*.html', 'src/manifest.json']).pipe(gulp.dest('build'));
 });
 
 gulp.task('watch', function() {
