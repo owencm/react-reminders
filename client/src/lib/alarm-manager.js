@@ -1,26 +1,23 @@
 import { getDeviceId } from './device-id.js';
-import PushClient from './push-client.js';
+import pushWrapper from './push-wrapper.js';
 
 let key;
 let queuedRequests = [];
 
-let pushClient = new PushClient(
-  () => {},
-  (subscription) => {
-    if (subscription) {
-      flushQueue(subscription);
-    }
-  }
-);
-
 let flushQueueIfSubscriptionAvailable = () => {
-  pushClient.getSubscription().then((subscription) => {
+  pushWrapper.getSubscription().then((subscription) => {
     if (subscription) {
       flushQueue(subscription.endpoint);
     }
   });
 }
 
+pushWrapper.addSubscriptionChangeListener(flushQueueIfSubscriptionAvailable);
+pushWrapper.hasPermission().then((permissionGranted) => {
+  if (permissionGranted) {
+    pushWrapper.subscribeDevice();
+  }
+});
 flushQueueIfSubscriptionAvailable();
 
 // These will be sent when flushQueue is called, and they will have subscription
@@ -44,7 +41,7 @@ const sendToServer = (path, body) => {
     method: 'POST',
     body: JSON.stringify(body),
     headers: new Headers({'Content-Type': 'application/json'})
-  }).then((resp) => { console.log(resp) })
+  }).then((resp) => { console.log('Server responded:', resp) })
 }
 
 const set = (tag, targetTime, interval) => {
@@ -69,4 +66,6 @@ const init = (aPIKey) => {
   key = aPIKey;
 }
 
-module.exports = { set, init };
+const subscribeDevice = pushWrapper.subscribeDevice;
+
+module.exports = { set, init, subscribeDevice };

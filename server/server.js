@@ -5,19 +5,23 @@ var jsonParser = bodyParser.json();
 var scheduler = require('./lib/interval-scheduler.js');
 var gcm = require('node-gcm');
 
+var send = false;
+
 // Scheduling
 var notifyClientAboutTodo = function (subscription) {
   console.log('Time to ping', subscription);
-  var sender = new gcm.Sender(subscription.key);
-  var message = new gcm.Message();
-  var regTokens = [subscription.endpoint.slice(40, subscription.endpoint.length)];
-  sender.send(message, { registrationTokens: regTokens }, function(err, response) {
-    if (err) {
-      console.log(err);
-    } else {
-      console.log(response);
-    }
-  })
+  if (send) {
+    var sender = new gcm.Sender(subscription.key);
+    var message = new gcm.Message();
+    var regTokens = [subscription.endpoint.slice(40, subscription.endpoint.length)];
+    sender.send(message, { registrationTokens: regTokens }, function(err, response) {
+      if (err) {
+        console.log(err);
+      } else {
+        console.log(response);
+      }
+    });
+  }
 }
 
 scheduler.register('todo-caller', notifyClientAboutTodo);

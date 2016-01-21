@@ -21,9 +21,6 @@ injectTapEventPlugin();
 
 import serviceWorkerSetup from './service-worker-setup.js';
 serviceWorkerSetup();
-import push from './push.js';
-push.init();
-// The initialization hasn't completed so knowing how to subscribe immediately is a pain
 
 import model from './model.js';
 model.init();
@@ -59,7 +56,7 @@ let handleCreateClicked = () => {
     }
     model.addTodo(title, interval);
     // TODO: dim the screen at this point
-    push.subscribeDevice().then(() => {
+    alarmManager.subscribeDevice().then(() => {
       console.log('Subscribed for notifications successfully!');
     });
   }, 0);

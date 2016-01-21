@@ -111,29 +111,29 @@ module.exports = {
 
 var _deviceId = require('./device-id.js');
 
-var _pushClient = require('./push-client.js');
+var _pushWrapper = require('./push-wrapper.js');
 
-var _pushClient2 = _interopRequireDefault(_pushClient);
+var _pushWrapper2 = _interopRequireDefault(_pushWrapper);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 var key = undefined;
 var queuedRequests = [];
 
-var pushClient = new _pushClient2.default(function () {}, function (subscription) {
-  if (subscription) {
-    flushQueue(subscription);
-  }
-});
-
 var flushQueueIfSubscriptionAvailable = function flushQueueIfSubscriptionAvailable() {
-  pushClient.getSubscription().then(function (subscription) {
+  _pushWrapper2.default.getSubscription().then(function (subscription) {
     if (subscription) {
       flushQueue(subscription.endpoint);
     }
   });
 };
 
+_pushWrapper2.default.addSubscriptionChangeListener(flushQueueIfSubscriptionAvailable);
+_pushWrapper2.default.hasPermission().then(function (permissionGranted) {
+  if (permissionGranted) {
+    _pushWrapper2.default.subscribeDevice();
+  }
+});
 flushQueueIfSubscriptionAvailable();
 
 // These will be sent when flushQueue is called, and they will have subscription
@@ -158,7 +158,7 @@ var sendToServer = function sendToServer(path, body) {
     body: JSON.stringify(body),
     headers: new Headers({ 'Content-Type': 'application/json' })
   }).then(function (resp) {
-    console.log(resp);
+    console.log('Server responded:', resp);
   });
 };
 
@@ -183,9 +183,11 @@ var init = function init(aPIKey) {
   key = aPIKey;
 };
 
-module.exports = { set: set, init: init };
+var subscribeDevice = _pushWrapper2.default.subscribeDevice;
 
-},{"./device-id.js":5,"./push-client.js":6}],5:[function(require,module,exports){
+module.exports = { set: set, init: init, subscribeDevice: subscribeDevice };
+
+},{"./device-id.js":5,"./push-wrapper.js":7}],5:[function(require,module,exports){
 'use strict';
 
 var _localforage = require('localforage');
@@ -467,6 +469,89 @@ exports.default = PushClient;
 },{}],7:[function(require,module,exports){
 'use strict';
 
+var _pushClient = require('./push-client.js');
+
+var _pushClient2 = _interopRequireDefault(_pushClient);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var pushClient = undefined; // The event system was awkward. I often wanted just to query "can I do this?"
+// then do it, and use promises to know what happens
+
+var stateChangeListeners = [];
+var subscriptionChangeListeners = [];
+
+var stateChangeListener = function stateChangeListener(state, data) {
+  stateChangeListeners.map(function (listener) {
+    return listener(state, data);
+  });
+};
+
+var subscriptionChangeListener = function subscriptionChangeListener(newSubscription) {
+  subscriptionChangeListeners.map(function (listener) {
+    return listener(newSubscription);
+  });
+};
+
+// Initialize
+pushClient = new _pushClient2.default(stateChangeListener, subscriptionChangeListener);
+
+var addStateChangeListener = function addStateChangeListener(listener) {
+  stateChangeListeners.push(listener);
+};
+
+var addSubscriptionChangeListener = function addSubscriptionChangeListener(listener) {
+  subscriptionChangeListeners.push(listener);
+};
+
+// let subscriptionUpdateListener = (newSubscription) => {
+//   console.log('subscriptionUpdate: ', newSubscription);
+//   if (!newSubscription) {
+//     // Remove any subscription from your servers if you have
+//     // set it up.
+//     return;
+//   }
+// };
+
+var subscribeDevice = function subscribeDevice() {
+  return new Promise(function (resolve, reject) {
+    var promiseComplete = false;
+    stateChangeListeners.push(function (state, data) {
+      if (!promiseComplete) {
+        if (state.id === 'PERMISSION_GRANTED') {
+          resolve();
+          promiseComplete = true;
+        } else if (state.id === 'PERMISSION_DENIED') {
+          reject();
+          promiseComplete = true;
+        }
+      }
+    });
+    pushClient.subscribeDevice();
+  });
+};
+
+var getSubscription = function getSubscription() {
+  return pushClient.getSubscription();
+};
+
+var hasPermission = function hasPermission() {
+  return navigator.permissions.query({ name: 'push', userVisibleOnly: true }).then(function (permissionState) {
+    return permissionState.state === 'granted';
+  });
+};
+
+module.exports = {
+  subscribeDevice: subscribeDevice,
+  getSubscription: getSubscription,
+  addStateChangeListener: addStateChangeListener,
+  addSubscriptionChangeListener: addSubscriptionChangeListener,
+  hasPermission: hasPermission
+};
+
+},{"./push-client.js":6}],8:[function(require,module,exports){
+'use strict';
+
 var _react = require('react');
 
 var _react2 = _interopRequireDefault(_react);
@@ -519,10 +604,6 @@ var _serviceWorkerSetup = require('./service-worker-setup.js');
 
 var _serviceWorkerSetup2 = _interopRequireDefault(_serviceWorkerSetup);
 
-var _push = require('./push.js');
-
-var _push2 = _interopRequireDefault(_push);
-
 var _model = require('./model.js');
 
 var _model2 = _interopRequireDefault(_model);
@@ -546,9 +627,6 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 // Temporary hack to enable material-ui until React 1.0 is released
 
 (0, _serviceWorkerSetup2.default)();
-
-_push2.default.init();
-// The initialization hasn't completed so knowing how to subscribe immediately is a pain
 
 _model2.default.init();
 
@@ -581,7 +659,7 @@ var handleCreateClicked = function handleCreateClicked() {
     }
     _model2.default.addTodo(title, interval);
     // TODO: dim the screen at this point
-    _push2.default.subscribeDevice().then(function () {
+    _alarmManager2.default.subscribeDevice().then(function () {
       console.log('Subscribed for notifications successfully!');
     });
   }, 0);
@@ -624,7 +702,7 @@ var render = function render(todos, dueTodos, futureTodos) {
 // Note this will call the listener when it is added
 _model2.default.addListener(render);
 
-},{"./components/todo-list.js":2,"./lib/alarm-manager.js":4,"./lib/device-id.js":5,"./model.js":8,"./push.js":9,"./service-worker-setup.js":10,"./strings.js":11,"material-ui/lib/app-bar":69,"material-ui/lib/divider":70,"material-ui/lib/floating-action-button":72,"material-ui/lib/font-icon":73,"material-ui/lib/icon-button":74,"material-ui/lib/lists/list":76,"material-ui/lib/lists/list-item":75,"material-ui/lib/svg-icons/content/add":97,"react":258,"react-dom":119,"react-tap-event-plugin":123}],8:[function(require,module,exports){
+},{"./components/todo-list.js":2,"./lib/alarm-manager.js":4,"./lib/device-id.js":5,"./model.js":9,"./service-worker-setup.js":10,"./strings.js":11,"material-ui/lib/app-bar":69,"material-ui/lib/divider":70,"material-ui/lib/floating-action-button":72,"material-ui/lib/font-icon":73,"material-ui/lib/icon-button":74,"material-ui/lib/lists/list":76,"material-ui/lib/lists/list-item":75,"material-ui/lib/svg-icons/content/add":97,"react":258,"react-dom":119,"react-tap-event-plugin":123}],9:[function(require,module,exports){
 'use strict';
 
 var _localforage = require('localforage');
@@ -763,80 +841,7 @@ module.exports = {
   getFutureTodos: getFutureTodos
 };
 
-},{"./dates.js":3,"localforage":51}],9:[function(require,module,exports){
-'use strict';
-
-var _pushClient = require('./lib/push-client.js');
-
-var _pushClient2 = _interopRequireDefault(_pushClient);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var pushClient = undefined; // The event system was awkward. I often wanted just to query "can I do this?"
-// then do it, and use promises to know what happens
-
-var stateChangeListeners = [];
-
-stateChangeListeners.push(function (state, data) {
-  console.log(state);
-  if (typeof state.interactive !== 'undefined') {
-    if (state.interactive) {}
-  }
-
-  if (typeof state.pushEnabled !== 'undefined') {
-    if (state.pushEnabled) {}
-  }
-
-  switch (state.id) {
-    case 'ERROR':
-      console.error(data);
-      showErrorMessage('Ooops a Problem Occurred', data);
-      break;
-    default:
-      break;
-  }
-});
-
-var init = function init() {
-  var stateChangeListener = function stateChangeListener(state, data) {
-    stateChangeListeners.map(function (listener) {
-      return listener(state, data);
-    });
-  };
-
-  var subscriptionUpdate = function subscriptionUpdate(newSubscription) {
-    console.log('subscriptionUpdate: ', newSubscription);
-    if (!newSubscription) {
-      // Remove any subscription from your servers if you have
-      // set it up.
-      return;
-    }
-  };
-
-  pushClient = new _pushClient2.default(stateChangeListener, subscriptionUpdate);
-};
-
-var subscribeDevice = function subscribeDevice() {
-  return new Promise(function (resolve, reject) {
-    var promiseComplete = false;
-    pushClient.subscribeDevice();
-    stateChangeListeners.push(function (state, data) {
-      if (!promiseComplete) {
-        if (state.id === 'PERMISSION_GRANTED') {
-          resolve();
-          promiseComplete = true;
-        } else if (state.id === 'PERMISSION_DENIED') {
-          reject();
-          promiseComplete = true;
-        }
-      }
-    });
-  });
-};
-
-module.exports = { init: init, subscribeDevice: subscribeDevice };
-
-},{"./lib/push-client.js":6}],10:[function(require,module,exports){
+},{"./dates.js":3,"localforage":51}],10:[function(require,module,exports){
 'use strict';
 
 var init = function init() {
@@ -32099,4 +32104,4 @@ if (process.env.NODE_ENV !== 'production') {
 module.exports = warning;
 
 }).call(this,require('_process'))
-},{"_process":114}]},{},[7]);
+},{"_process":114}]},{},[8]);
