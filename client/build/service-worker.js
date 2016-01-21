@@ -182,8 +182,8 @@ var getNotifications = function getNotifications() {
             var body = '';
             if (todo) {
                 title = 'Apire: ' + todo.title;
-                var todoFrequencyAndLastDone = _strings2.default.todoFrequencyAndLastDone(todo.frequency, todo.lastDone);
-                body = todoFrequencyAndLastDone;
+                var todoIntervalAndLastDone = _strings2.default.todoIntervalAndLastDone(todo.interval, todo.lastDone);
+                body = todoIntervalAndLastDone;
             }
             var icon = 'TODO.png';
             var urlToOpen = 'http://www.google.com/';

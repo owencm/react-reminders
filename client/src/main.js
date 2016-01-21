@@ -1,3 +1,5 @@
+// TODO: resubscribe every time the page is loaded if we still have permission
+
 import React from 'react';
 import ReactDOM from 'react-dom';
 
@@ -25,8 +27,17 @@ push.init();
 
 import model from './model.js';
 model.init();
-import scheduleManager from './schedule-manager.js';
-model.addListener(scheduleManager);
+import alarmManager from './lib/alarm-manager.js';
+alarmManager.init('AIzaSyBBh4ddPa96rQQNxqiq_qQj7sq1JdsNQUQ');
+model.addListener((todos, dueTodos, futureTodos) => {
+  for (let i = 0; i < todos.length; i++) {
+    let todo = todos[i];
+    let interval = todo.interval * 24*60*60*1000;
+    let targetTime = todo.lastDone + interval;
+    let tag = todo.id;
+    alarmManager.set(tag, targetTime, interval);
+  }
+});
 import strings from './strings.js';
 import { getDeviceId } from './lib/device-id.js';
 

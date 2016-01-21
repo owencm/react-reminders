@@ -16,11 +16,11 @@ const getNotifications = () => {
       let body = '';
       if (todo) {
         title = `Apire: ${todo.title}`;
-        let todoFrequencyAndLastDone = strings.todoFrequencyAndLastDone(
-          todo.frequency,
+        let todoIntervalAndLastDone = strings.todoIntervalAndLastDone(
+          todo.interval,
           todo.lastDone
         );
-        body = todoFrequencyAndLastDone;
+        body = todoIntervalAndLastDone;
       }
       const icon = 'TODO.png';
       const urlToOpen = 'http://www.google.com/'

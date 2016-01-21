@@ -1,6 +1,7 @@
-import { getDeviceId } from './lib/device-id.js';
-import PushClient from './lib/push-client.js';
+import { getDeviceId } from './device-id.js';
+import PushClient from './push-client.js';
 
+let key;
 let queuedRequests = [];
 
 let pushClient = new PushClient(
@@ -12,21 +13,21 @@ let pushClient = new PushClient(
   }
 );
 
-pushClient.getSubscription().then((subscription) => {
-  if (subscription) {
-    flushQueue(subscription);
-  }
-});
+let flushQueueIfSubscriptionAvailable = () => {
+  pushClient.getSubscription().then((subscription) => {
+    if (subscription) {
+      flushQueue(subscription.endpoint);
+    }
+  });
+}
+
+flushQueueIfSubscriptionAvailable();
 
 // These will be sent when flushQueue is called, and they will have subscription
 // added to body
 const addToQueue = (path, body) => {
   queuedRequests.push({path, body});
-  pushClient.getSubscription().then((subscription) => {
-    if (subscription) {
-      flushQueue(subscription);
-    }
-  });
+  flushQueueIfSubscriptionAvailable();
 }
 
 const flushQueue = (subscription) => {
@@ -46,18 +47,26 @@ const sendToServer = (path, body) => {
   }).then((resp) => { console.log(resp) })
 }
 
-const listener = (todos, dueTodos, futureTodos) => {
+const set = (tag, targetTime, interval) => {
+  if (key === undefined) {
+    throw new Error(`You must initialize alarm-manager with an API key before
+      calling set.`)
+  }
   // Send to the server scheduling information, keyed by a device ID and the todo ID
   // so if the todo changes we can clear the previous schedule on the server
   getDeviceId().then((deviceId) => {
-    for (let i = 0; i < todos.length; i++) {
-      let todo = todos[i];
-      let interval = todo.interval * 24*60*60*1000;
-      let targetTime = todo.lastDone + interval;
-      let tag = `todoId:${todo.id}, deviceId:${deviceId}`;
-      addToQueue('schedule', { tag, targetTime, interval });
-    }
-  })
+    // Note the subscription ID gets added when the queue is flushed
+    addToQueue('/v1/set', {
+      key: key,
+      tag: tag + '.' + deviceId,
+      targetTime,
+      interval
+    });
+  });
 }
 
-module.exports = listener;
+const init = (aPIKey) => {
+  key = aPIKey;
+}
+
+module.exports = { set, init };

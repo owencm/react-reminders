@@ -109,6 +109,85 @@ module.exports = {
 },{}],4:[function(require,module,exports){
 'use strict';
 
+var _deviceId = require('./device-id.js');
+
+var _pushClient = require('./push-client.js');
+
+var _pushClient2 = _interopRequireDefault(_pushClient);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var key = undefined;
+var queuedRequests = [];
+
+var pushClient = new _pushClient2.default(function () {}, function (subscription) {
+  if (subscription) {
+    flushQueue(subscription);
+  }
+});
+
+var flushQueueIfSubscriptionAvailable = function flushQueueIfSubscriptionAvailable() {
+  pushClient.getSubscription().then(function (subscription) {
+    if (subscription) {
+      flushQueue(subscription.endpoint);
+    }
+  });
+};
+
+flushQueueIfSubscriptionAvailable();
+
+// These will be sent when flushQueue is called, and they will have subscription
+// added to body
+var addToQueue = function addToQueue(path, body) {
+  queuedRequests.push({ path: path, body: body });
+  flushQueueIfSubscriptionAvailable();
+};
+
+var flushQueue = function flushQueue(subscription) {
+  for (var i = 0; i < queuedRequests.length; i++) {
+    var req = queuedRequests[i];
+    req.body.subscription = subscription;
+    sendToServer(req.path, req.body);
+  }
+  queuedRequests = [];
+};
+
+var sendToServer = function sendToServer(path, body) {
+  fetch(path, {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: new Headers({ 'Content-Type': 'application/json' })
+  }).then(function (resp) {
+    console.log(resp);
+  });
+};
+
+var set = function set(tag, targetTime, interval) {
+  if (key === undefined) {
+    throw new Error('You must initialize alarm-manager with an API key before\n      calling set.');
+  }
+  // Send to the server scheduling information, keyed by a device ID and the todo ID
+  // so if the todo changes we can clear the previous schedule on the server
+  (0, _deviceId.getDeviceId)().then(function (deviceId) {
+    // Note the subscription ID gets added when the queue is flushed
+    addToQueue('/v1/set', {
+      key: key,
+      tag: tag + '.' + deviceId,
+      targetTime: targetTime,
+      interval: interval
+    });
+  });
+};
+
+var init = function init(aPIKey) {
+  key = aPIKey;
+};
+
+module.exports = { set: set, init: init };
+
+},{"./device-id.js":5,"./push-client.js":6}],5:[function(require,module,exports){
+'use strict';
+
 var _localforage = require('localforage');
 
 var _localforage2 = _interopRequireDefault(_localforage);
@@ -137,7 +216,7 @@ var getDeviceId = function getDeviceId() {
 
 module.exports = { getDeviceId: getDeviceId };
 
-},{"localforage":51}],5:[function(require,module,exports){
+},{"localforage":51}],6:[function(require,module,exports){
 // The library doesn't use an explicit permission request, but uses subscribe,
 // which has high latency and fails when offline
 
@@ -385,7 +464,7 @@ var PushClient = function () {
 
 exports.default = PushClient;
 
-},{}],6:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 'use strict';
 
 var _react = require('react');
@@ -448,9 +527,9 @@ var _model = require('./model.js');
 
 var _model2 = _interopRequireDefault(_model);
 
-var _scheduleManager = require('./schedule-manager.js');
+var _alarmManager = require('./lib/alarm-manager.js');
 
-var _scheduleManager2 = _interopRequireDefault(_scheduleManager);
+var _alarmManager2 = _interopRequireDefault(_alarmManager);
 
 var _strings = require('./strings.js');
 
@@ -459,6 +538,8 @@ var _strings2 = _interopRequireDefault(_strings);
 var _deviceId = require('./lib/device-id.js');
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+// TODO: resubscribe every time the page is loaded if we still have permission
 
 (0, _reactTapEventPlugin2.default)();
 
@@ -471,7 +552,16 @@ _push2.default.init();
 
 _model2.default.init();
 
-_model2.default.addListener(_scheduleManager2.default);
+_alarmManager2.default.init('AIzaSyBBh4ddPa96rQQNxqiq_qQj7sq1JdsNQUQ');
+_model2.default.addListener(function (todos, dueTodos, futureTodos) {
+  for (var i = 0; i < todos.length; i++) {
+    var todo = todos[i];
+    var interval = todo.interval * 24 * 60 * 60 * 1000;
+    var targetTime = todo.lastDone + interval;
+    var tag = todo.id;
+    _alarmManager2.default.set(tag, targetTime, interval);
+  }
+});
 
 var handleDoneClicked = function handleDoneClicked(todo) {
   _model2.default.markDone(todo.id);
@@ -534,7 +624,7 @@ var render = function render(todos, dueTodos, futureTodos) {
 // Note this will call the listener when it is added
 _model2.default.addListener(render);
 
-},{"./components/todo-list.js":2,"./lib/device-id.js":4,"./model.js":7,"./push.js":8,"./schedule-manager.js":9,"./service-worker-setup.js":10,"./strings.js":11,"material-ui/lib/app-bar":69,"material-ui/lib/divider":70,"material-ui/lib/floating-action-button":72,"material-ui/lib/font-icon":73,"material-ui/lib/icon-button":74,"material-ui/lib/lists/list":76,"material-ui/lib/lists/list-item":75,"material-ui/lib/svg-icons/content/add":97,"react":258,"react-dom":119,"react-tap-event-plugin":123}],7:[function(require,module,exports){
+},{"./components/todo-list.js":2,"./lib/alarm-manager.js":4,"./lib/device-id.js":5,"./model.js":8,"./push.js":9,"./service-worker-setup.js":10,"./strings.js":11,"material-ui/lib/app-bar":69,"material-ui/lib/divider":70,"material-ui/lib/floating-action-button":72,"material-ui/lib/font-icon":73,"material-ui/lib/icon-button":74,"material-ui/lib/lists/list":76,"material-ui/lib/lists/list-item":75,"material-ui/lib/svg-icons/content/add":97,"react":258,"react-dom":119,"react-tap-event-plugin":123}],8:[function(require,module,exports){
 'use strict';
 
 var _localforage = require('localforage');
@@ -673,7 +763,7 @@ module.exports = {
   getFutureTodos: getFutureTodos
 };
 
-},{"./dates.js":3,"localforage":51}],8:[function(require,module,exports){
+},{"./dates.js":3,"localforage":51}],9:[function(require,module,exports){
 'use strict';
 
 var _pushClient = require('./lib/push-client.js');
@@ -746,78 +836,7 @@ var subscribeDevice = function subscribeDevice() {
 
 module.exports = { init: init, subscribeDevice: subscribeDevice };
 
-},{"./lib/push-client.js":5}],9:[function(require,module,exports){
-'use strict';
-
-var _deviceId = require('./lib/device-id.js');
-
-var _pushClient = require('./lib/push-client.js');
-
-var _pushClient2 = _interopRequireDefault(_pushClient);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var queuedRequests = [];
-
-var pushClient = new _pushClient2.default(function () {}, function (subscription) {
-  if (subscription) {
-    flushQueue(subscription);
-  }
-});
-
-pushClient.getSubscription().then(function (subscription) {
-  if (subscription) {
-    flushQueue(subscription);
-  }
-});
-
-// These will be sent when flushQueue is called, and they will have subscription
-// added to body
-var addToQueue = function addToQueue(path, body) {
-  queuedRequests.push({ path: path, body: body });
-  pushClient.getSubscription().then(function (subscription) {
-    if (subscription) {
-      flushQueue(subscription);
-    }
-  });
-};
-
-var flushQueue = function flushQueue(subscription) {
-  for (var i = 0; i < queuedRequests.length; i++) {
-    var req = queuedRequests[i];
-    req.body.subscription = subscription;
-    sendToServer(req.path, req.body);
-  }
-  queuedRequests = [];
-};
-
-var sendToServer = function sendToServer(path, body) {
-  fetch(path, {
-    method: 'POST',
-    body: JSON.stringify(body),
-    headers: new Headers({ 'Content-Type': 'application/json' })
-  }).then(function (resp) {
-    console.log(resp);
-  });
-};
-
-var listener = function listener(todos, dueTodos, futureTodos) {
-  // Send to the server scheduling information, keyed by a device ID and the todo ID
-  // so if the todo changes we can clear the previous schedule on the server
-  (0, _deviceId.getDeviceId)().then(function (deviceId) {
-    for (var i = 0; i < todos.length; i++) {
-      var todo = todos[i];
-      var interval = todo.interval * 24 * 60 * 60 * 1000;
-      var targetTime = todo.lastDone + interval;
-      var tag = 'todoId:' + todo.id + ', deviceId:' + deviceId;
-      addToQueue('schedule', { tag: tag, targetTime: targetTime, interval: interval });
-    }
-  });
-};
-
-module.exports = listener;
-
-},{"./lib/device-id.js":4,"./lib/push-client.js":5}],10:[function(require,module,exports){
+},{"./lib/push-client.js":6}],10:[function(require,module,exports){
 'use strict';
 
 var init = function init() {
@@ -32080,4 +32099,4 @@ if (process.env.NODE_ENV !== 'production') {
 module.exports = warning;
 
 }).call(this,require('_process'))
-},{"_process":114}]},{},[6]);
+},{"_process":114}]},{},[7]);
