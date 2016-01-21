@@ -9,8 +9,6 @@ let ready = false;
 
 const addListener = (listener) => {
   listeners.push(listener);
-  let dueTodos = filterDueTodos(todos);
-  let futureTodos = filterFutureTodos(todos);
 }
 
 const notifyListenersOfChange = () => {
@@ -25,8 +23,8 @@ const notifyListenerOfChange = (listener, todos, dueTodos, futureTodos) => {
 
 let todos;
 
-const addTodo = (title, frequency, lastDone = dates.now()) => {
-  todos.push({title, frequency, lastDone, id: todos.length});
+const addTodo = (title, interval, lastDone = dates.now()) => {
+  todos.push({title, interval, lastDone, id: todos.length});
   notifyListenersOfChange();
 }
 
@@ -61,9 +59,10 @@ let init = () => {
   todos = [];
 
   lf.ready()
+    // .then(() => lf.setItem('todos', null))
     .then(() => lf.getItem('todos'))
     .then((storedTodos) => {
-      if (todos === undefined) {
+      if (storedTodos === null) {
         ready = true;
         addTodo('Call Mum', 7, 0);
         addTodo('Deep clean the kitchen', 14);
@@ -79,10 +78,10 @@ let init = () => {
     })
     .catch((e) => { console.error(e) });
 
-  setInterval(() => {
-    todos.map((todo) => { todo.lastDone -= 24*60*60*1000 });
-    notifyListenersOfChange();
-  }, 10000);
+  // setInterval(() => {
+  //   todos.map((todo) => { todo.lastDone -= 24*60*60*1000 });
+  //   notifyListenersOfChange();
+  // }, 10000);
 };
 
 // Stateless helpers
@@ -91,7 +90,7 @@ const filterFutureTodos = (todos) => {
   let futureTodos = [];
   for (let i = 0; i < todos.length; i++) {
     let todo = todos[i];
-    if (dates.daysSince(todo.lastDone) < todo.frequency) {
+    if (dates.daysSince(todo.lastDone) < todo.interval) {
       futureTodos.push(todo);
     }
   }
@@ -100,12 +99,12 @@ const filterFutureTodos = (todos) => {
 
 const filterDueTodos = (todos) => {
   if (!ready) {
-    console.error('tried to read a todo before they were loaded');
+    console.error('Tried to read a todo before they were loaded');
   }
   let dueTodos = [];
   for (let i = 0; i < todos.length; i++) {
     let todo = todos[i];
-    if (dates.daysSince(todo.lastDone) >= todo.frequency) {
+    if (dates.daysSince(todo.lastDone) >= todo.interval) {
       dueTodos.push(todo);
     }
   }

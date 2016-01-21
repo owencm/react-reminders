@@ -1,107 +1,128 @@
-var logging = false;
-var log = function () {
-  if (logging) {
-    console.log.apply(console, arguments);
-  }
-}
+var setBigInterval = require('./big-interval.js');
+var setBigTimeout = require('./big-timeout.js');
+var log = require('./conditional-log.js')(false);
 
-var callbacks = {};
+// TODO: Maybe move to an indexed storage system so we can look up by tag faster
+var storage = require('node-persist');
+storage.initSync();
+
+var SERIALIZED_INTERVALS = 'serialized-intervals';
+
+// A map from serialized callbacks to the real callbacks, added via register()
+var externalCallbacks = {};
 
 // Users of the library call this each time the process is started so serialized
 // timeouts know what callback to call (since you can't serialize callbacks)
 var register = function (id, callback) {
-  if (callbacks[id]) {
+  if (externalCallbacks[id]) {
     throw new Error ('Cannot register the same interval-scheduler ID twice');
   }
-  callbacks[id] = callback;
+  externalCallbacks[id] = callback;
 }
 
-var callRegisteredCallback = function (id, callbackValue) {
-  log('callRegisteredCallback', id, callbackValue);
-  callbacks[id](callbackValue);
+var callRegisteredCallback = function (externalId, callbackValue) {
+  log('callRegisteredCallback', externalId, callbackValue);
+  externalCallbacks[externalId](callbackValue);
 }
 
-// This takes a list of serializable callbacks and calls them
-var callMultiple = function (callbacks) {
-  log('callMultiple',callbacks);
-  for (var i = 0; i < callbacks.length; i++) {
-    var callback = callbacks[i];
-    callRegisteredCallback(callback.callbackId, callback.callbackValue);
+var isIntervalActive = function (id) {
+  return storage.getItem(SERIALIZED_INTERVALS)
+           .filter(function(sInterval) {
+             return sInterval.id === id;
+           })
+           .length > 0;
+}
+
+// This is the external entrypoint to this library
+var setPersistentBigInterval = function (externalId,
+                                         callbackValue,
+                                         tag,
+                                         interval,
+                                         delay) {
+
+  // Create a unique ID for this interval so if one is created with the same tag
+  // we can recognize the one that should be de-activated
+  var id = Math.random() + '' + Math.random();
+
+  storeIntervalPersistently(id, externalId, callbackValue, tag, interval, delay);
+
+  if (!externalCallbacks[externalId]) {
+    console.log(externalCallbacks);
+    throw new Error(`Forgot to register ${externalId} with interval-scheduler
+                     before scheduling`);
   }
-}
-register('call-multiple', callMultiple);
 
-// This takes a serializable callback and delay and calls it after the right delay
-// It takes account of setTimeout only functioning for delay values < 2^31
-var twoThirtyOne = Math.pow(2, 31);
-var scheduleBigTimeout = function (options) {
-  log('scheduleBigTimeout called with options', options);
-  var callbackId = options.callbackId;
-  var callbackValue = options.callbackValue;
-  var delay = options.delay;
-  var scheduleInner = function(callbackId, callbackValue, delay) {
-    var delayRemaining = 0;
-    if (delay >= twoThirtyOne) {
-      delayRemaining = delay - twoThirtyOne;
-      setTimeout(function () {
-        scheduleInner(callbackId, callbackValue, delayRemaining);
-      }, twoThirtyOne);
-    } else {
-      // TODO: persist me
-      setTimeout(function () {
-        callRegisteredCallback(callbackId, callbackValue);
-      }, delay);
+  setBigIntervalForSerializableCallback(id, externalId, callbackValue, tag, interval, delay);
+
+}
+
+var clearPersistentInterval = function(tag) {
+  var serializedIntervals = storage.getItem(SERIALIZED_INTERVALS) || [];
+  var newSerializedIntervals = serializedIntervals.filter(function(sInterval) {
+    return (sInterval.tag !== tag);
+  });
+  if (newSerializedIntervals.length === serializedIntervals) {
+    throw new Error(`No interval with tag ${tag} to clear`);
+  }
+  storage.setItem(SERIALIZED_INTERVALS, newSerializedIntervals);
+}
+
+var setBigIntervalForSerializableCallback = function (id,
+                                                      externalId,
+                                                      callbackValue,
+                                                      tag,
+                                                      interval,
+                                                      delay) {
+
+  setBigInterval(function () {
+    if (isIntervalActive(id)) {
+      callRegisteredCallback(externalId, callbackValue);
     }
-  }
-  scheduleInner(callbackId, callbackValue, delay);
-}
-register('schedule-big-timeout', scheduleBigTimeout);
-
-// This takes a serializable callback, interval and delay
-var scheduleBigInterval = function (options) {
-  log('scheduleBigInterval called with ',options);
-  var callbackId = options.callbackId;
-  var callbackValue = options.callbackValue;
-  var interval = options.interval;
-  var delay = options.delay;
-  if (delay > 0) {
-    scheduleBigTimeout({
-      callbackId: 'schedule-big-interval',
-      callbackValue: {
-        callbackId: callbackId,
-        callbackValue: callbackValue,
-        interval: interval,
-        delay: 0
-      },
-    delay: delay});
-  } else {
-    // If there's no delay, set a timeout which recursively calls set interval
-    // and the callback simultaneously
-    scheduleBigTimeout({
-      callbackId: 'call-multiple',
-      callbackValue: [{
-        callbackId: 'schedule-big-interval',
-        callbackValue: {
-          callbackId: callbackId,
-          callbackValue: callbackValue,
-          interval: interval
-        }
-      }, {
-        callbackId: callbackId,
-        callbackValue: callbackValue
-      }],
-      delay: interval
-    });
-  }
-}
-register('schedule-big-interval', scheduleBigInterval);
-
-// This takes a serializable callback, interval and delay
-var schedulePersistentBigInterval = function (callbackId, callbackValue, interval, delay) {
-  if (!callbacks[callbackId]) {
-    throw new Error(`Forgot to register ${callbackId} with interval-scheduler before scheduling`);
-  }
-  scheduleBigInterval({callbackId, callbackValue, interval, delay});
+  }, interval, delay);
 }
 
-module.exports = { register, schedulePersistentBigInterval };
+var convertStartTimeAndIntervalToDelay = function (startTime, interval) {
+  var now = Date.now();
+  var delay = startTime - now;
+  // If it was supposed to have already started, find the amount of time until
+  // the next interval should have been
+  if (delay < 0) {
+    // Modulo of negative numbers is still negative, so add one more interval
+    delay = delay % interval + interval;
+  }
+  return delay;
+}
+
+var storeIntervalPersistently = function (id, externalId, callbackValue, tag, interval, delay) {
+  // Persist them on disk in terms of time setd to start, not delay from now
+  var startTime = Date.now() + delay;
+  var serializedIntervals = storage.getItem(SERIALIZED_INTERVALS) || [];
+  // Make sure to replace intervals with the same tag
+  serializedIntervals = serializedIntervals.filter(function(sInterval) {
+    return (sInterval.tag !== tag);
+  });
+  serializedIntervals.push({id, externalId, callbackValue, tag, interval, startTime});
+  storage.setItem(SERIALIZED_INTERVALS, serializedIntervals);
+}
+
+var restoreIntervals = function () {
+  var serializedIntervals = storage.getItem(SERIALIZED_INTERVALS) || [];
+  log('Recovered intervals', serializedIntervals);
+  for (var i = 0; i < serializedIntervals.length; i++) {
+    var sInterval = serializedIntervals[i];
+    var delay = convertStartTimeAndIntervalToDelay(sInterval.startTime,
+                                                   sInterval.interval);
+
+    setBigIntervalForSerializableCallback(sInterval.id,
+                                          sInterval.externalId,
+                                          sInterval.callbackValue,
+                                          sInterval.tag,
+                                          sInterval.interval,
+                                          delay);
+
+  }
+}
+
+restoreIntervals();
+
+module.exports = { register, setPersistentBigInterval, clearPersistentInterval };

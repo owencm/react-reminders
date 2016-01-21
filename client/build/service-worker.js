@@ -1,101 +1,296 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-// shim for using process in browser
+"use strict";
 
-var process = module.exports = {};
-var queue = [];
-var draining = false;
-var currentQueue;
-var queueIndex = -1;
-
-function cleanUpNextTick() {
-    draining = false;
-    if (currentQueue.length) {
-        queue = currentQueue.concat(queue);
-    } else {
-        queueIndex = -1;
-    }
-    if (queue.length) {
-        drainQueue();
-    }
-}
-
-function drainQueue() {
-    if (draining) {
-        return;
-    }
-    var timeout = setTimeout(cleanUpNextTick);
-    draining = true;
-
-    var len = queue.length;
-    while(len) {
-        currentQueue = queue;
-        queue = [];
-        while (++queueIndex < len) {
-            if (currentQueue) {
-                currentQueue[queueIndex].run();
-            }
-        }
-        queueIndex = -1;
-        len = queue.length;
-    }
-    currentQueue = null;
-    draining = false;
-    clearTimeout(timeout);
-}
-
-process.nextTick = function (fun) {
-    var args = new Array(arguments.length - 1);
-    if (arguments.length > 1) {
-        for (var i = 1; i < arguments.length; i++) {
-            args[i - 1] = arguments[i];
-        }
-    }
-    queue.push(new Item(fun, args));
-    if (queue.length === 1 && !draining) {
-        setTimeout(drainQueue, 0);
-    }
+var now = function now() {
+  return Date.now();
 };
 
-// v8 likes predictible objects
-function Item(fun, array) {
-    this.fun = fun;
-    this.array = array;
-}
-Item.prototype.run = function () {
-    this.fun.apply(null, this.array);
-};
-process.title = 'browser';
-process.browser = true;
-process.env = {};
-process.argv = [];
-process.version = ''; // empty string to avoid regexp issues
-process.versions = {};
-
-function noop() {}
-
-process.on = noop;
-process.addListener = noop;
-process.once = noop;
-process.off = noop;
-process.removeListener = noop;
-process.removeAllListeners = noop;
-process.emit = noop;
-
-process.binding = function (name) {
-    throw new Error('process.binding is not supported');
+var daysBetween = function daysBetween(dateA, dateB) {
+  return Math.round(Math.abs(dateA - dateB) / (1000 * 60 * 60 * 24));
 };
 
-process.cwd = function () { return '/' };
-process.chdir = function (dir) {
-    throw new Error('process.chdir is not supported');
+var daysSince = function daysSince(date) {
+  return daysBetween(date, now());
 };
-process.umask = function() { return 0; };
+
+module.exports = {
+  now: now, daysBetween: daysBetween, daysSince: daysSince
+};
 
 },{}],2:[function(require,module,exports){
+'use strict';
+
+var _localforage = require('localforage');
+
+var _localforage2 = _interopRequireDefault(_localforage);
+
+var _dates = require('./dates.js');
+
+var _dates2 = _interopRequireDefault(_dates);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var lf = _localforage2.default; // TODO: Find a nicer way to handle the generation of dueTodos and futureTodos etc
+
+var listeners = [];
+var ready = false;
+
+var addListener = function addListener(listener) {
+  listeners.push(listener);
+};
+
+var notifyListenersOfChange = function notifyListenersOfChange() {
+  var dueTodos = filterDueTodos(todos);
+  var futureTodos = filterFutureTodos(todos);
+  listeners.map(function (listener) {
+    return notifyListenerOfChange(listener, todos, dueTodos, futureTodos);
+  });
+};
+
+var notifyListenerOfChange = function notifyListenerOfChange(listener, todos, dueTodos, futureTodos) {
+  listener(todos, dueTodos, futureTodos);
+};
+
+var todos = undefined;
+
+var addTodo = function addTodo(title, interval) {
+  var lastDone = arguments.length <= 2 || arguments[2] === undefined ? _dates2.default.now() : arguments[2];
+
+  todos.push({ title: title, interval: interval, lastDone: lastDone, id: todos.length });
+  notifyListenersOfChange();
+};
+
+var markDone = function markDone(todoId) {
+  for (var i = 0; i < todos.length; i++) {
+    var todo = todos[i];
+    if (todo.id === todoId) {
+      todo.lastDone = _dates2.default.now();
+      notifyListenersOfChange();
+      return;
+    }
+  }
+  throw new Error('Could not find todo to mark done');
+};
+
+var getDueTodos = function getDueTodos() {
+  if (!ready) {
+    throw new Error('Tried to access todos before it was loaded');
+  }
+  return filterDueTodos(todos);
+};
+
+var getFutureTodos = function getFutureTodos() {
+  if (!ready) {
+    throw new Error('Tried to access todos before it was loaded');
+  }
+  return filterFutureTodos(todos);
+};
+
+var init = function init() {
+  console.log('initializing the model');
+  todos = [];
+
+  lf.ready()
+  // .then(() => lf.setItem('todos', null))
+  .then(function () {
+    return lf.getItem('todos');
+  }).then(function (storedTodos) {
+    if (storedTodos === null) {
+      ready = true;
+      addTodo('Call Mum', 7, 0);
+      addTodo('Deep clean the kitchen', 14);
+    } else {
+      todos = storedTodos;
+      ready = true;
+      notifyListenersOfChange();
+    }
+    // Do this only after we've restored todos to avoid race conditions
+    addListener(function () {
+      lf.ready().then(function () {
+        return lf.setItem('todos', todos);
+      });
+    });
+  }).catch(function (e) {
+    console.error(e);
+  });
+
+  // setInterval(() => {
+  //   todos.map((todo) => { todo.lastDone -= 24*60*60*1000 });
+  //   notifyListenersOfChange();
+  // }, 10000);
+};
+
+// Stateless helpers
+
+var filterFutureTodos = function filterFutureTodos(todos) {
+  var futureTodos = [];
+  for (var i = 0; i < todos.length; i++) {
+    var todo = todos[i];
+    if (_dates2.default.daysSince(todo.lastDone) < todo.interval) {
+      futureTodos.push(todo);
+    }
+  }
+  return futureTodos;
+};
+
+var filterDueTodos = function filterDueTodos(todos) {
+  if (!ready) {
+    console.error('Tried to read a todo before they were loaded');
+  }
+  var dueTodos = [];
+  for (var i = 0; i < todos.length; i++) {
+    var todo = todos[i];
+    if (_dates2.default.daysSince(todo.lastDone) >= todo.interval) {
+      dueTodos.push(todo);
+    }
+  }
+  return dueTodos;
+};
+
+module.exports = {
+  init: init,
+  addTodo: addTodo,
+  markDone: markDone,
+  addListener: addListener,
+  getDueTodos: getDueTodos,
+  getFutureTodos: getFutureTodos
+};
+
+},{"./dates.js":1,"localforage":5}],3:[function(require,module,exports){
+'use strict';
+
+var _model = require('./model.js');
+
+var _model2 = _interopRequireDefault(_model);
+
+var _strings = require('./strings.js');
+
+var _strings2 = _interopRequireDefault(_strings);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+// App code
+
+var getNotifications = function getNotifications() {
+    return new Promise(function (resolve, reject) {
+        _model2.default.init();
+        // Hack to ensure todos are loaded. TODO: Fix me
+        setTimeout(function () {
+            var dueTodos = _model2.default.getDueTodos();
+            var todo = dueTodos[0];
+            var title = 'Aspire: Why not add a new aspiration today?';
+            var body = '';
+            if (todo) {
+                title = 'Apire: ' + todo.title;
+                var todoFrequencyAndLastDone = _strings2.default.todoFrequencyAndLastDone(todo.frequency, todo.lastDone);
+                body = todoFrequencyAndLastDone;
+            }
+            var icon = 'TODO.png';
+            var urlToOpen = 'http://www.google.com/';
+            resolve([{ title: title, body: body, icon: icon, urlToOpen: urlToOpen }]);
+        }, 1000);
+    });
+};
+
+// Library code
+
+var showNotification = function showNotification(title, body, icon, data) {
+    console.log('showNotification');
+    var notificationOptions = {
+        body: body,
+        icon: icon,
+        tag: 'static-yo',
+        data: data
+    };
+    return self.registration.showNotification(title, notificationOptions);
+};
+
+self.addEventListener('push', function (event) {
+    console.log('Received a push message', event);
+    event.waitUntil(getNotifications().then(function (notifications) {
+        // TODO: Handle multiple notifications
+        var notification = notifications[0];
+        var notificationData = { url: notification.urlToOpen };
+        return showNotification(notification.title, notification.body, notification.icon, notificationData);
+    }).catch(function (err) {
+        console.error('A Problem occured with handling the push msg', err);
+        var title = 'An error occured';
+        var message = '';
+        return showNotification(title, message);
+    }));
+});
+
+self.addEventListener('notificationclick', function (event) {
+    var url = event.notification.data.url;
+    event.notification.close();
+    event.waitUntil(clients.openWindow(url));
+});
+
+// fetch(YAHOO_WEATHER_API_ENDPOINT).then(response => {
+// if (response.status !== 200) {
+//     // Throw an error so the promise is rejected and catch() is executed
+//     throw new Error(`Invalid status code from weather API: ${ response.status }`);
+// }
+// Examine the text in the response
+//     return response.json();
+// }).then(data => {
+
+},{"./model.js":2,"./strings.js":4}],4:[function(require,module,exports){
+'use strict';
+
+var _dates = require('./dates.js');
+
+var _dates2 = _interopRequireDefault(_dates);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var desiredInterval = function desiredInterval(days) {
+  switch (days) {
+    case 1:
+      return 'Every day';
+    case 7:
+      return 'Every week';
+    case 14:
+      return 'Every two weeks';
+    case 30:
+      return 'Every month';
+    default:
+      throw new Error('Invalid interval specified for todo');
+  }
+};
+
+var lastDone = function lastDone(days) {
+  if (days < 1) {
+    return 'just now';
+  } else if (days < 2) {
+    return 'yesterday';
+  } else if (days < 7) {
+    return 'this week';
+  } else if (days < 14) {
+    return 'one week ago';
+  } else if (days < 30) {
+    return 'this month';
+  } else if (days < 60) {
+    return 'one month ago';
+  } else {
+    return 'a long time ago';
+  }
+};
+
+var todoIntervalAndLastDone = function todoIntervalAndLastDone(todoInterval, todoLastDone) {
+  var daysSinceLastDone = _dates2.default.daysSince(todoLastDone);
+  return desiredInterval(todoInterval) + ', last done ' + lastDone(daysSinceLastDone);
+};
+
+module.exports = {
+  todoIntervalAndLastDone: todoIntervalAndLastDone
+};
+
+},{"./dates.js":1}],5:[function(require,module,exports){
 (function (process,global){
 /*!
     localForage -- Offline Storage, Improved
-    Version 1.3.1
+    Version 1.3.2
     https://mozilla.github.io/localForage
     (c) 2013-2015 Mozilla, Apache License 2.0
 */
@@ -844,7 +1039,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
 
-	(function () {
+	var localForage = (function (globalObject) {
 	    'use strict';
 
 	    // Custom drivers are stored here when `defineDriver()` is called.
@@ -872,39 +1067,46 @@ return /******/ (function(modules) { // webpackBootstrap
 	        version: 1.0
 	    };
 
-	    // Check to see if IndexedDB is available and if it is the latest
-	    // implementation; it's our preferred backend library. We use "_spec_test"
-	    // as the name of the database because it's not the one we'll operate on,
-	    // but it's useful to make sure its using the right spec.
-	    // See: https://github.com/mozilla/localForage/issues/128
 	    var driverSupport = (function (self) {
-	        // Initialize IndexedDB; fall back to vendor-prefixed versions
-	        // if needed.
-	        var indexedDB = indexedDB || self.indexedDB || self.webkitIndexedDB || self.mozIndexedDB || self.OIndexedDB || self.msIndexedDB;
-
 	        var result = {};
 
-	        result[DriverType.WEBSQL] = !!self.openDatabase;
+	        // Check to see if IndexedDB is available and if it is the latest
+	        // implementation; it's our preferred backend library. We use "_spec_test"
+	        // as the name of the database because it's not the one we'll operate on,
+	        // but it's useful to make sure its using the right spec.
+	        // See: https://github.com/mozilla/localForage/issues/128
 	        result[DriverType.INDEXEDDB] = !!(function () {
-	            // We mimic PouchDB here; just UA test for Safari (which, as of
-	            // iOS 8/Yosemite, doesn't properly support IndexedDB).
-	            // IndexedDB support is broken and different from Blink's.
-	            // This is faster than the test case (and it's sync), so we just
-	            // do this. *SIGH*
-	            // http://bl.ocks.org/nolanlawson/raw/c83e9039edf2278047e9/
-	            //
-	            // We test for openDatabase because IE Mobile identifies itself
-	            // as Safari. Oh the lulz...
-	            if (typeof self.openDatabase !== 'undefined' && self.navigator && self.navigator.userAgent && /Safari/.test(self.navigator.userAgent) && !/Chrome/.test(self.navigator.userAgent)) {
-	                return false;
-	            }
 	            try {
+	                // Initialize IndexedDB; fall back to vendor-prefixed versions
+	                // if needed.
+	                var indexedDB = indexedDB || self.indexedDB || self.webkitIndexedDB || self.mozIndexedDB || self.OIndexedDB || self.msIndexedDB;
+	                // We mimic PouchDB here; just UA test for Safari (which, as of
+	                // iOS 8/Yosemite, doesn't properly support IndexedDB).
+	                // IndexedDB support is broken and different from Blink's.
+	                // This is faster than the test case (and it's sync), so we just
+	                // do this. *SIGH*
+	                // http://bl.ocks.org/nolanlawson/raw/c83e9039edf2278047e9/
+	                //
+	                // We test for openDatabase because IE Mobile identifies itself
+	                // as Safari. Oh the lulz...
+	                if (typeof self.openDatabase !== 'undefined' && self.navigator && self.navigator.userAgent && /Safari/.test(self.navigator.userAgent) && !/Chrome/.test(self.navigator.userAgent)) {
+	                    return false;
+	                }
+
 	                return indexedDB && typeof indexedDB.open === 'function' &&
 	                // Some Samsung/HTC Android 4.0-4.3 devices
 	                // have older IndexedDB specs; if this isn't available
 	                // their IndexedDB is too old for us to use.
 	                // (Replaces the onupgradeneeded test.)
 	                typeof self.IDBKeyRange !== 'undefined';
+	            } catch (e) {
+	                return false;
+	            }
+	        })();
+
+	        result[DriverType.WEBSQL] = !!(function () {
+	            try {
+	                return self.openDatabase;
 	            } catch (e) {
 	                return false;
 	            }
@@ -919,7 +1121,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        })();
 
 	        return result;
-	    })(this);
+	    })(globalObject);
 
 	    var isArray = Array.isArray || function (arg) {
 	        return Object.prototype.toString.call(arg) === '[object Array]';
@@ -1246,10 +1448,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	        return LocalForage;
 	    })();
 
-	    var localForage = new LocalForage();
-
-	    exports['default'] = localForage;
-	}).call(typeof window !== 'undefined' ? window : self);
+	    return new LocalForage();
+	})(typeof window !== 'undefined' ? window : self);
+	exports['default'] = localForage;
 	module.exports = exports['default'];
 
 /***/ },
@@ -1261,12 +1462,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	'use strict';
 
 	exports.__esModule = true;
-	(function () {
+	var asyncStorage = (function (globalObject) {
 	    'use strict';
 
-	    var globalObject = this;
 	    // Initialize IndexedDB; fall back to vendor-prefixed versions if needed.
-	    var indexedDB = indexedDB || this.indexedDB || this.webkitIndexedDB || this.mozIndexedDB || this.OIndexedDB || this.msIndexedDB;
+	    var indexedDB = indexedDB || globalObject.indexedDB || globalObject.webkitIndexedDB || globalObject.mozIndexedDB || globalObject.OIndexedDB || globalObject.msIndexedDB;
 
 	    // If IndexedDB isn't available, we get outta here!
 	    if (!indexedDB) {
@@ -1379,6 +1579,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	                    });
 	                };
 	            };
+	            txn.onerror = txn.onabort = reject;
 	        })['catch'](function () {
 	            return false; // error, so assume unsupported
 	        });
@@ -1422,6 +1623,23 @@ return /******/ (function(modules) { // webpackBootstrap
 	        return value && value.__local_forage_encoded_blob;
 	    }
 
+	    // Specialize the default `ready()` function by making it dependant
+	    // on the current database operations. Thus, the driver will be actually
+	    // ready when it's been initialized (default) *and* there are no pending
+	    // operations on the database (initiated by some other instances).
+	    function _fullyReady(callback) {
+	        var self = this;
+
+	        var promise = self._initReady().then(function () {
+	            if (self._dbReady) {
+	                return self._dbReady;
+	            }
+	        });
+
+	        promise.then(callback, callback);
+	        return promise;
+	    }
+
 	    // Open the IndexedDB database (automatically creates one if one didn't
 	    // previously exist), using any options set in the config.
 	    function _initStorage(options) {
@@ -1450,17 +1668,26 @@ return /******/ (function(modules) { // webpackBootstrap
 	                // Running localForages sharing a database.
 	                forages: [],
 	                // Shared database.
-	                db: null
+	                db: null,
+	                // States of the database operations.
+	                deferredOperations: {},
+	                operationPromises: []
 	            };
 	            // Register the new context in the global container.
 	            dbContexts[dbInfo.name] = dbContext;
 	        }
 
 	        // Register itself as a running localForage in the current context.
-	        dbContext.forages.push(this);
+	        dbContext.forages.push(self);
 
-	        // Create an array of readiness of the related localForages.
-	        var readyPromises = [];
+	        // Replace the default `ready()` function with the specialized one.
+	        if (!self._initReady) {
+	            self._initReady = self.ready;
+	            self.ready = _fullyReady;
+	        }
+
+	        // Create an array of initialization states of the related localForages.
+	        var initPromises = [];
 
 	        function ignoreErrors() {
 	            // Don't handle errors here,
@@ -1468,11 +1695,25 @@ return /******/ (function(modules) { // webpackBootstrap
 	            return Promise.resolve();
 	        }
 
+	        function defer(resolve, reject) {
+	            this.resolve = resolve;
+	            this.reject = reject;
+	        }
+
 	        for (var j = 0; j < dbContext.forages.length; j++) {
 	            var forage = dbContext.forages[j];
-	            if (forage !== this) {
+	            if (forage !== self) {
 	                // Don't wait for itself...
-	                readyPromises.push(forage.ready()['catch'](ignoreErrors));
+	                initPromises.push(forage._initReady()['catch'](ignoreErrors));
+
+	                // Create a deferred object and add it on related localForages
+	                // to make them wait until the database operation required
+	                // by this current instance has finished.
+	                var deferredOperation = {};
+	                deferredOperation.promise = new Promise(defer.bind(deferredOperation));
+	                dbContext.deferredOperations[dbInfo.storeName] = deferredOperation;
+	                dbContext.operationPromises.push(deferredOperation.promise);
+	                forage._dbReady = Promise.all(dbContext.operationPromises);
 	            }
 	        }
 
@@ -1481,7 +1722,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	        // Initialize the connection process only when
 	        // all the related localForages aren't pending.
-	        return Promise.all(readyPromises).then(function () {
+	        return Promise.all(initPromises).then(function () {
 	            dbInfo.db = dbContext.db;
 	            // Get the connection or open a new one without upgrade.
 	            return _getOriginalConnection(dbInfo);
@@ -1558,6 +1799,12 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	            openreq.onsuccess = function () {
 	                resolve(openreq.result);
+	                // Resolve the deferred operation, on which other related
+	                // localForage instances depend on to be ready again.
+	                var deferredOperation = dbContexts[dbInfo.name].deferredOperations[dbInfo.storeName];
+	                if (deferredOperation) {
+	                    deferredOperation.resolve();
+	                }
 	            };
 	        });
 	    }
@@ -1711,7 +1958,6 @@ return /******/ (function(modules) { // webpackBootstrap
 	                    value = undefined;
 	                }
 
-	                var req = store.put(value, key);
 	                transaction.oncomplete = function () {
 	                    // Cast to undefined so the value passed to
 	                    // callback/promise is the same as what one would get out
@@ -1729,6 +1975,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	                    var err = req.error ? req.error : req.transaction.error;
 	                    reject(err);
 	                };
+
+	                var req = store.put(value, key);
 	            })['catch'](reject);
 	        });
 
@@ -1934,8 +2182,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	        keys: keys
 	    };
 
-	    exports['default'] = asyncStorage;
-	}).call(typeof window !== 'undefined' ? window : self);
+	    return asyncStorage;
+	})(typeof window !== 'undefined' ? window : self);
+	exports['default'] = asyncStorage;
 	module.exports = exports['default'];
 
 /***/ },
@@ -1949,10 +2198,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	'use strict';
 
 	exports.__esModule = true;
-	(function () {
+	var localStorageWrapper = (function (globalObject) {
 	    'use strict';
 
-	    var globalObject = this;
 	    var localStorage = null;
 
 	    // If the app is running inside a Google Chrome packaged webapp, or some
@@ -1963,12 +2211,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	    try {
 	        // If localStorage isn't available, we get outta here!
 	        // This should be inside a try catch
-	        if (!this.localStorage || !('setItem' in this.localStorage)) {
+	        if (!globalObject.localStorage || !('setItem' in globalObject.localStorage)) {
 	            return;
 	        }
 	        // Initialize localStorage and create a variable to use throughout
 	        // the code.
-	        localStorage = this.localStorage;
+	        localStorage = globalObject.localStorage;
 	    } catch (e) {
 	        return;
 	    }
@@ -2242,8 +2490,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	        keys: keys
 	    };
 
-	    exports['default'] = localStorageWrapper;
-	}).call(typeof window !== 'undefined' ? window : self);
+	    return localStorageWrapper;
+	})(typeof window !== 'undefined' ? window : self);
+	exports['default'] = localStorageWrapper;
 	module.exports = exports['default'];
 
 /***/ },
@@ -2253,7 +2502,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	'use strict';
 
 	exports.__esModule = true;
-	(function () {
+	var localforageSerializer = (function (globalObject) {
 	    'use strict';
 
 	    // Sadly, the best way to save binary data in WebSQL/localStorage is serializing
@@ -2280,9 +2529,6 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var TYPE_FLOAT32ARRAY = 'fl32';
 	    var TYPE_FLOAT64ARRAY = 'fl64';
 	    var TYPE_SERIALIZED_MARKER_LENGTH = SERIALIZED_MARKER_LENGTH + TYPE_ARRAYBUFFER.length;
-
-	    // Get out of our habit of using `window` inline, at least.
-	    var globalObject = this;
 
 	    // Abstracts constructing a Blob object, so it also works in older
 	    // browsers that don't support the native Blob constructor. (i.e.
@@ -2507,8 +2753,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	        bufferToString: bufferToString
 	    };
 
-	    exports['default'] = localforageSerializer;
-	}).call(typeof window !== 'undefined' ? window : self);
+	    return localforageSerializer;
+	})(typeof window !== 'undefined' ? window : self);
+	exports['default'] = localforageSerializer;
 	module.exports = exports['default'];
 
 /***/ },
@@ -2527,11 +2774,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	'use strict';
 
 	exports.__esModule = true;
-	(function () {
+	var webSQLStorage = (function (globalObject) {
 	    'use strict';
 
-	    var globalObject = this;
-	    var openDatabase = this.openDatabase;
+	    var openDatabase = globalObject.openDatabase;
 
 	    // If WebSQL methods aren't available, we can stop now.
 	    if (!openDatabase) {
@@ -2869,8 +3115,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	        keys: keys
 	    };
 
-	    exports['default'] = webSQLStorage;
-	}).call(typeof window !== 'undefined' ? window : self);
+	    return webSQLStorage;
+	})(typeof window !== 'undefined' ? window : self);
+	exports['default'] = webSQLStorage;
 	module.exports = exports['default'];
 
 /***/ }
@@ -2878,294 +3125,97 @@ return /******/ (function(modules) { // webpackBootstrap
 });
 ;
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"_process":1}],3:[function(require,module,exports){
-"use strict";
+},{"_process":6}],6:[function(require,module,exports){
+// shim for using process in browser
 
-var now = function now() {
-  return Date.now();
-};
+var process = module.exports = {};
+var queue = [];
+var draining = false;
+var currentQueue;
+var queueIndex = -1;
 
-var daysBetween = function daysBetween(dateA, dateB) {
-  return Math.round(Math.abs(dateA - dateB) / (1000 * 60 * 60 * 24));
-};
-
-var daysSince = function daysSince(date) {
-  return daysBetween(date, now());
-};
-
-module.exports = {
-  now: now, daysBetween: daysBetween, daysSince: daysSince
-};
-
-},{}],4:[function(require,module,exports){
-'use strict';
-
-var _localforage = require('localforage');
-
-var _localforage2 = _interopRequireDefault(_localforage);
-
-var _dates = require('./dates.js');
-
-var _dates2 = _interopRequireDefault(_dates);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var lf = _localforage2.default; // TODO: Find a nicer way to handle the generation of dueTodos and futureTodos etc
-
-var listeners = [];
-var ready = false;
-
-var addListener = function addListener(listener) {
-  listeners.push(listener);
-  var dueTodos = filterDueTodos(todos);
-  var futureTodos = filterFutureTodos(todos);
-};
-
-var notifyListenersOfChange = function notifyListenersOfChange() {
-  var dueTodos = filterDueTodos(todos);
-  var futureTodos = filterFutureTodos(todos);
-  listeners.map(function (listener) {
-    return notifyListenerOfChange(listener, todos, dueTodos, futureTodos);
-  });
-};
-
-var notifyListenerOfChange = function notifyListenerOfChange(listener, todos, dueTodos, futureTodos) {
-  listener(todos, dueTodos, futureTodos);
-};
-
-var todos = undefined;
-
-var addTodo = function addTodo(title, frequency) {
-  var lastDone = arguments.length <= 2 || arguments[2] === undefined ? _dates2.default.now() : arguments[2];
-
-  todos.push({ title: title, frequency: frequency, lastDone: lastDone, id: todos.length });
-  notifyListenersOfChange();
-};
-
-var markDone = function markDone(todoId) {
-  for (var i = 0; i < todos.length; i++) {
-    var todo = todos[i];
-    if (todo.id === todoId) {
-      todo.lastDone = _dates2.default.now();
-      notifyListenersOfChange();
-      return;
-    }
-  }
-  throw new Error('Could not find todo to mark done');
-};
-
-var getDueTodos = function getDueTodos() {
-  if (!ready) {
-    throw new Error('Tried to access todos before it was loaded');
-  }
-  return filterDueTodos(todos);
-};
-
-var getFutureTodos = function getFutureTodos() {
-  if (!ready) {
-    throw new Error('Tried to access todos before it was loaded');
-  }
-  return filterFutureTodos(todos);
-};
-
-var init = function init() {
-  console.log('initializing the model');
-  todos = [];
-
-  lf.ready().then(function () {
-    return lf.getItem('todos');
-  }).then(function (storedTodos) {
-    if (todos === undefined) {
-      ready = true;
-      addTodo('Call Mum', 7, 0);
-      addTodo('Deep clean the kitchen', 14);
+function cleanUpNextTick() {
+    draining = false;
+    if (currentQueue.length) {
+        queue = currentQueue.concat(queue);
     } else {
-      todos = storedTodos;
-      ready = true;
-      notifyListenersOfChange();
+        queueIndex = -1;
     }
-    // Do this only after we've restored todos to avoid race conditions
-    addListener(function () {
-      lf.ready().then(function () {
-        return lf.setItem('todos', todos);
-      });
-    });
-  }).catch(function (e) {
-    console.error(e);
-  });
-
-  setInterval(function () {
-    todos.map(function (todo) {
-      todo.lastDone -= 24 * 60 * 60 * 1000;
-    });
-    notifyListenersOfChange();
-  }, 10000);
-};
-
-// Stateless helpers
-
-var filterFutureTodos = function filterFutureTodos(todos) {
-  var futureTodos = [];
-  for (var i = 0; i < todos.length; i++) {
-    var todo = todos[i];
-    if (_dates2.default.daysSince(todo.lastDone) < todo.frequency) {
-      futureTodos.push(todo);
+    if (queue.length) {
+        drainQueue();
     }
-  }
-  return futureTodos;
-};
+}
 
-var filterDueTodos = function filterDueTodos(todos) {
-  if (!ready) {
-    console.error('tried to read a todo before they were loaded');
-  }
-  var dueTodos = [];
-  for (var i = 0; i < todos.length; i++) {
-    var todo = todos[i];
-    if (_dates2.default.daysSince(todo.lastDone) >= todo.frequency) {
-      dueTodos.push(todo);
+function drainQueue() {
+    if (draining) {
+        return;
     }
-  }
-  return dueTodos;
-};
+    var timeout = setTimeout(cleanUpNextTick);
+    draining = true;
 
-module.exports = {
-  init: init,
-  addTodo: addTodo,
-  markDone: markDone,
-  addListener: addListener,
-  getDueTodos: getDueTodos,
-  getFutureTodos: getFutureTodos
-};
-
-},{"./dates.js":3,"localforage":2}],5:[function(require,module,exports){
-'use strict';
-
-var _model = require('./model.js');
-
-var _model2 = _interopRequireDefault(_model);
-
-var _strings = require('./strings.js');
-
-var _strings2 = _interopRequireDefault(_strings);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-// App code
-
-var getNotifications = function getNotifications() {
-    return new Promise(function (resolve, reject) {
-        _model2.default.init();
-        // Hack to ensure todos are loaded. TODO: Fix me
-        setTimeout(function () {
-            var dueTodos = _model2.default.getDueTodos();
-            var todo = dueTodos[0];
-            var title = 'Aspire: Why not add a new aspiration today?';
-            var body = '';
-            if (todo) {
-                title = 'Apire: ' + todo.title;
-                var todoFrequencyAndLastDone = _strings2.default.todoFrequencyAndLastDone(todo.frequency, todo.lastDone);
-                body = todoFrequencyAndLastDone;
+    var len = queue.length;
+    while(len) {
+        currentQueue = queue;
+        queue = [];
+        while (++queueIndex < len) {
+            if (currentQueue) {
+                currentQueue[queueIndex].run();
             }
-            var icon = 'TODO.png';
-            var urlToOpen = 'http://www.google.com/';
-            resolve([{ title: title, body: body, icon: icon, urlToOpen: urlToOpen }]);
-        }, 1000);
-    });
+        }
+        queueIndex = -1;
+        len = queue.length;
+    }
+    currentQueue = null;
+    draining = false;
+    clearTimeout(timeout);
+}
+
+process.nextTick = function (fun) {
+    var args = new Array(arguments.length - 1);
+    if (arguments.length > 1) {
+        for (var i = 1; i < arguments.length; i++) {
+            args[i - 1] = arguments[i];
+        }
+    }
+    queue.push(new Item(fun, args));
+    if (queue.length === 1 && !draining) {
+        setTimeout(drainQueue, 0);
+    }
 };
 
-// Library code
+// v8 likes predictible objects
+function Item(fun, array) {
+    this.fun = fun;
+    this.array = array;
+}
+Item.prototype.run = function () {
+    this.fun.apply(null, this.array);
+};
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+process.version = ''; // empty string to avoid regexp issues
+process.versions = {};
 
-var showNotification = function showNotification(title, body, icon, data) {
-    console.log('showNotification');
-    var notificationOptions = {
-        body: body,
-        icon: icon,
-        tag: 'static-yo',
-        data: data
-    };
-    return self.registration.showNotification(title, notificationOptions);
+function noop() {}
+
+process.on = noop;
+process.addListener = noop;
+process.once = noop;
+process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
+process.emit = noop;
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
 };
 
-self.addEventListener('push', function (event) {
-    console.log('Received a push message', event);
-    event.waitUntil(getNotifications().then(function (notifications) {
-        // TODO: Handle multiple notifications
-        var notification = notifications[0];
-        var notificationData = { url: notification.urlToOpen };
-        return showNotification(notification.title, notification.body, notification.icon, notificationData);
-    }).catch(function (err) {
-        console.error('A Problem occured with handling the push msg', err);
-        var title = 'An error occured';
-        var message = '';
-        return showNotification(title, message);
-    }));
-});
-
-self.addEventListener('notificationclick', function (event) {
-    var url = event.notification.data.url;
-    event.notification.close();
-    event.waitUntil(clients.openWindow(url));
-});
-
-// fetch(YAHOO_WEATHER_API_ENDPOINT).then(response => {
-// if (response.status !== 200) {
-//     // Throw an error so the promise is rejected and catch() is executed
-//     throw new Error(`Invalid status code from weather API: ${ response.status }`);
-// }
-// Examine the text in the response
-//     return response.json();
-// }).then(data => {
-
-},{"./model.js":4,"./strings.js":6}],6:[function(require,module,exports){
-'use strict';
-
-var _dates = require('./dates.js');
-
-var _dates2 = _interopRequireDefault(_dates);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var desiredFrequency = function desiredFrequency(days) {
-  switch (days) {
-    case 1:
-      return 'Every day';
-    case 7:
-      return 'Every week';
-    case 14:
-      return 'Every two weeks';
-    case 30:
-      return 'Every month';
-    default:
-      throw new Error('Invalid frequency specified for todo');
-  }
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
 };
+process.umask = function() { return 0; };
 
-var lastDone = function lastDone(days) {
-  if (days < 1) {
-    return 'just now';
-  } else if (days < 2) {
-    return 'yesterday';
-  } else if (days < 7) {
-    return 'this week';
-  } else if (days < 14) {
-    return 'one week ago';
-  } else if (days < 30) {
-    return 'this month';
-  } else if (days < 60) {
-    return 'one month ago';
-  } else {
-    return 'a long time ago';
-  }
-};
-
-var todoFrequencyAndLastDone = function todoFrequencyAndLastDone(todoFrequency, todoLastDone) {
-  var daysSinceLastDone = _dates2.default.daysSince(todoLastDone);
-  return desiredFrequency(todoFrequency) + ', last done ' + lastDone(daysSinceLastDone);
-};
-
-module.exports = {
-  todoFrequencyAndLastDone: todoFrequencyAndLastDone
-};
-
-},{"./dates.js":3}]},{},[5]);
+},{}]},{},[3]);

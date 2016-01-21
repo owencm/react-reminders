@@ -29,9 +29,6 @@ import scheduleManager from './schedule-manager.js';
 model.addListener(scheduleManager);
 import strings from './strings.js';
 import { getDeviceId } from './lib/device-id.js';
-getDeviceId().then((id) => {
-  console.log(id);
-});
 
 let handleDoneClicked = (todo) => {
   model.markDone(todo.id);
@@ -45,11 +42,11 @@ let handleCreateClicked = () => {
     if (title === '' || title === undefined || title === null) {
       return;
     }
-    let frequency = parseInt(prompt('How many days would you like to wait between doing it?'));
-    if (isNaN(frequency) || frequency === undefined || frequency === null) {
+    let interval = parseInt(prompt('How many days would you like to wait between doing it?'));
+    if (isNaN(interval) || interval === undefined || interval === null) {
       return;
     }
-    model.addTodo(title, frequency);
+    model.addTodo(title, interval);
     // TODO: dim the screen at this point
     push.subscribeDevice().then(() => {
       console.log('Subscribed for notifications successfully!');

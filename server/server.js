@@ -2,17 +2,14 @@ var express = require('express');
 var app = express();
 var bodyParser = require('body-parser');
 var jsonParser = bodyParser.json();
-var intervalScheduler = require('./lib/interval-scheduler.js');
+var scheduler = require('./lib/interval-scheduler.js');
 
 // Scheduling
-var notifyClientAboutTodo = function (todoId) {
-  console.log('Time to send todo', todoId);
+var notifyClientAboutTodo = function (subId) {
+  console.log('Time to ping', subId);
 }
 
-intervalScheduler.register('todo-caller', notifyClientAboutTodo);
-
-var schedulePersistentBigInterval = intervalScheduler.schedulePersistentBigInterval;
-schedulePersistentBigInterval('todo-caller', 0, 1000, 0);
+scheduler.register('todo-caller', notifyClientAboutTodo);
 
 // Server
 
@@ -21,7 +18,14 @@ app.use(express.static('../client/build'));
 app.use(bodyParser.json()); // for parsing application/json
 
 app.post('/schedule', jsonParser, function (req, res) {
-  // console.log('Update came:', req.body);
+  console.log('Update came:', req.body);
+  var todoId = `todo-${req.body.id}`;
+  var interval = req.body.frequency;
+  var delay = req.body.targetTime - Date.now();
+  var interval = 5000;
+  var delay = 2000;
+  var subId = req.body.subscription;
+  scheduler.setPersistentBigInterval('todo-caller', subId, todoId, interval, delay);
   res.sendStatus(200);
 });
 

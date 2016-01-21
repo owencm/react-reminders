@@ -1,6 +1,8 @@
 // The library doesn't use an explicit permission request, but uses subscribe,
 // which has high latency and fails when offline
 
+// need a way to get the subscription ID
+
 'use strict';
 
 export default class PushClient {
@@ -221,6 +223,14 @@ export default class PushClient {
     .catch((e) => {
       console.error('Error thrown while revoking push notifications. ' +
         'Most likely because push was never registered', e);
+    });
+  }
+
+  // TODO: Verify this works
+  getSubscription() {
+    return navigator.serviceWorker.ready
+    .then((serviceWorkerRegistration) => {
+      return serviceWorkerRegistration.pushManager.getSubscription();
     });
   }
 }

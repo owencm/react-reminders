@@ -1,4 +1,42 @@
 import { getDeviceId } from './lib/device-id.js';
+import PushClient from './lib/push-client.js';
+
+let queuedRequests = [];
+
+let pushClient = new PushClient(
+  () => {},
+  (subscription) => {
+    if (subscription) {
+      flushQueue(subscription);
+    }
+  }
+);
+
+pushClient.getSubscription().then((subscription) => {
+  if (subscription) {
+    flushQueue(subscription);
+  }
+});
+
+// These will be sent when flushQueue is called, and they will have subscription
+// added to body
+const addToQueue = (path, body) => {
+  queuedRequests.push({path, body});
+  pushClient.getSubscription().then((subscription) => {
+    if (subscription) {
+      flushQueue(subscription);
+    }
+  });
+}
+
+const flushQueue = (subscription) => {
+  for (let i = 0; i < queuedRequests.length; i++) {
+    let req = queuedRequests[i];
+    req.body.subscription = subscription;
+    sendToServer(req.path, req.body);
+  }
+  queuedRequests = [];
+}
 
 const sendToServer = (path, body) => {
   fetch(path, {
@@ -14,10 +52,10 @@ const listener = (todos, dueTodos, futureTodos) => {
   getDeviceId().then((deviceId) => {
     for (let i = 0; i < todos.length; i++) {
       let todo = todos[i];
-      let frequency = todo.frequency * 24*60*60*1000;
-      let targetTime = todo.lastDone + frequency;
-      let id = `todoId:${todo.id}, deviceId:${deviceId}`;
-      sendToServer('schedule', { id, targetTime, frequency });
+      let interval = todo.interval * 24*60*60*1000;
+      let targetTime = todo.lastDone + interval;
+      let tag = `todoId:${todo.id}, deviceId:${deviceId}`;
+      addToQueue('schedule', { tag, targetTime, interval });
     }
   })
 }

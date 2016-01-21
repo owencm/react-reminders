@@ -16,8 +16,8 @@ const TodoListItem = (props) => {
   return (
     <ListItem
       primaryText={props.todo.title}
-      secondaryText={strings.todoFrequencyAndLastDone(
-        props.todo.frequency,
+      secondaryText={strings.todoIntervalAndLastDone(
+        props.todo.interval,
         props.todo.lastDone
       )}
       rightIconButton={

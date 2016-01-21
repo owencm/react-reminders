@@ -1,6 +1,6 @@
 import dates from './dates.js';
 
-const desiredFrequency = (days) => {
+const desiredInterval = (days) => {
   switch (days) {
     case 1:
       return 'Every day';
@@ -11,7 +11,7 @@ const desiredFrequency = (days) => {
     case 30:
       return 'Every month';
     default:
-      throw new Error('Invalid frequency specified for todo');
+      throw new Error('Invalid interval specified for todo');
   }
 }
 
@@ -33,11 +33,11 @@ const lastDone = (days) => {
   }
 }
 
-const todoFrequencyAndLastDone = (todoFrequency, todoLastDone) => {
+const todoIntervalAndLastDone = (todoInterval, todoLastDone) => {
   let daysSinceLastDone = dates.daysSince(todoLastDone);
-  return `${desiredFrequency(todoFrequency)}, last done ${lastDone(daysSinceLastDone)}`;
+  return `${desiredInterval(todoInterval)}, last done ${lastDone(daysSinceLastDone)}`;
 }
 
 module.exports = {
-  todoFrequencyAndLastDone
+  todoIntervalAndLastDone
 };

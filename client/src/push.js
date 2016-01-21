@@ -38,9 +38,9 @@ const init = () => {
     stateChangeListeners.map((listener) => listener(state, data));
   };
 
-  let subscriptionUpdate = (subscription) => {
-    console.log('subscriptionUpdate: ', subscription);
-    if (!subscription) {
+  let subscriptionUpdate = (newSubscription) => {
+    console.log('subscriptionUpdate: ', newSubscription);
+    if (!newSubscription) {
       // Remove any subscription from your servers if you have
       // set it up.
       return;
