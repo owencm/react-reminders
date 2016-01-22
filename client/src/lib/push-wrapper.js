@@ -41,16 +41,13 @@ const addSubscriptionChangeListener = (listener) => {
 
 const subscribeDevice = () => {
   return new Promise((resolve, reject) => {
-    let promiseComplete = false;
+    // Note these stay in stateChangeListener and will try to resolve many times.
+    // TODO: Try to find a nicer solution
     stateChangeListeners.push((state, data) => {
-      if (!promiseComplete) {
-        if (state.id === 'PERMISSION_GRANTED') {
-          resolve();
-          promiseComplete = true;
-        } else if (state.id === 'PERMISSION_DENIED') {
-          reject();
-          promiseComplete = true;
-        }
+      if (state.id === 'PERMISSION_GRANTED' || state.id === 'SUBSCRIBED') {
+        resolve();
+      } else if (state.id === 'PERMISSION_DENIED') {
+        reject();
       }
     });
     pushClient.subscribeDevice();

@@ -10,6 +10,7 @@ alarmManagerSw.addListener((data) => {
       icon: 'icon.png',
       tag: title + body
   };
+  console.log('Showing a notification');
   return self.registration.showNotification(title, notificationOptions);
 });
 

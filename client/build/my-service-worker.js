@@ -25,6 +25,7 @@ self.addEventListener('push', function (event) {
     }
     return resp.json();
   }).then(function (data) {
+    console.log('Received data from server', data);
     notifyListeners(data);
   });
 });
@@ -79,6 +80,7 @@ _alarmManagerSw2.default.addListener(function (data) {
         icon: 'icon.png',
         tag: title + body
     };
+    console.log('Showing a notification');
     return self.registration.showNotification(title, notificationOptions);
 });
 

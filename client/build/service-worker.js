@@ -29,7 +29,7 @@ importScripts("my-service-worker.js");
 
 
 /* eslint-disable quotes, comma-spacing */
-var PrecacheConfig = [["/index.html","97efbf6e5934e3206c3752660ec53199"],["/main.js","eb46540062e1d92898c17de971a94e18"],["/my-service-worker.js","c86e6d22487f5f9763ecfca54cbce9e3"],["/service-worker.js","e0e6608969b68a969e540a0f92c29cb1"]];
+var PrecacheConfig = [["/index.html","97efbf6e5934e3206c3752660ec53199"],["/main.js","7c3fe7b8d3d2d6b0db9ad109aa244162"],["/my-service-worker.js","5ddb768c5ad4d829e19c8faadb9f4398"],["/service-worker.js","2adfea079be87ba22b4ce19098342144"]];
 /* eslint-enable quotes, comma-spacing */
 var CacheNamePrefix = 'sw-precache-v1--' + (self.registration ? self.registration.scope : '') + '-';
 

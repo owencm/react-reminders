@@ -20,6 +20,7 @@ self.addEventListener('push', event => {
       }
       return resp.json();
     }).then((data) => {
+      console.log('Received data from server', data);
       notifyListeners(data);
     });
 });

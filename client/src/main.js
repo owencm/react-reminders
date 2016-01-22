@@ -77,9 +77,7 @@ const handleEditClicked = (todo) => {
     }
     model.updateTodo(todo.id, title, interval);
     // TODO: dim the screen at this point
-    alarmManager.subscribeDevice().then(() => {
-      console.log('Subscribed for notifications successfully!');
-    });
+    alarmManager.subscribeDevice();
   }, 0);
 }
 
