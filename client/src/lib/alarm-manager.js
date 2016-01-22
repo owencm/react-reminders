@@ -1,3 +1,6 @@
+// TODO: in initialization take an sender ID and add it to the sites manifest
+// using the service worker
+
 import { getDeviceId } from './device-id.js';
 import pushWrapper from './push-wrapper.js';
 

@@ -55,7 +55,7 @@ var notifyClient = function (meta) {
   // fetched
   var data = meta.data;
   storeDataByDeviceId(data, deviceId);
-  console.log('Time to ping', subscription);
+  console.log('Pinging', subscription, 'with data', data);
   if (send) {
     // send = false;
     var sender = new gcm.Sender(subscription.key);

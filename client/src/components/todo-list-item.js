@@ -8,9 +8,10 @@ import DoneIcon from 'material-ui/lib/svg-icons/action/done';
 
 import strings from '../strings.js';
 
-let generateTouchTapHandler = (onDoneClick, todo) => {
-  return () => onDoneClick(todo);
+let generateTouchTapHandler = (handler, arg) => {
+  return () => handler(arg);
 }
+
 
 const TodoListItem = (props) => {
   return (
@@ -20,12 +21,12 @@ const TodoListItem = (props) => {
         props.todo.interval,
         props.todo.lastDone
       )}
+      onTouchTap={generateTouchTapHandler(props.onEditClick, props.todo)}
       rightIconButton={
         <IconButton onTouchTap={generateTouchTapHandler(props.onDoneClick, props.todo)}>
           <DoneIcon />
         </IconButton>
       }
-      key={props.todo.id}
     />
   )
 }

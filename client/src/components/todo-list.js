@@ -12,7 +12,12 @@ const TodoList = (props) => {
     return <noscript />;
   }
   let todoListItems = props.todos.map((todo) => {
-    return <TodoListItem todo={todo} onDoneClick={props.onDoneClick} />
+    return  <TodoListItem
+              todo={todo}
+              onDoneClick={props.onDoneClick}
+              onEditClick={props.onEditClick}
+              key={todo.id}
+            />
   });
   return (
     <List subheader={props.subheader}>

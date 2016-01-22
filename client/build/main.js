@@ -27,9 +27,9 @@ var _strings2 = _interopRequireDefault(_strings);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-var generateTouchTapHandler = function generateTouchTapHandler(onDoneClick, todo) {
+var generateTouchTapHandler = function generateTouchTapHandler(handler, arg) {
   return function () {
-    return onDoneClick(todo);
+    return handler(arg);
   };
 };
 
@@ -37,12 +37,12 @@ var TodoListItem = function TodoListItem(props) {
   return _react2.default.createElement(_listItem2.default, {
     primaryText: props.todo.title,
     secondaryText: _strings2.default.todoIntervalAndLastDone(props.todo.interval, props.todo.lastDone),
+    onTouchTap: generateTouchTapHandler(props.onEditClick, props.todo),
     rightIconButton: _react2.default.createElement(
       _iconButton2.default,
       { onTouchTap: generateTouchTapHandler(props.onDoneClick, props.todo) },
       _react2.default.createElement(_done2.default, null)
-    ),
-    key: props.todo.id
+    )
   });
 };
 
@@ -76,7 +76,12 @@ var TodoList = function TodoList(props) {
     return _react2.default.createElement('noscript', null);
   }
   var todoListItems = props.todos.map(function (todo) {
-    return _react2.default.createElement(_todoListItem2.default, { todo: todo, onDoneClick: props.onDoneClick });
+    return _react2.default.createElement(_todoListItem2.default, {
+      todo: todo,
+      onDoneClick: props.onDoneClick,
+      onEditClick: props.onEditClick,
+      key: todo.id
+    });
   });
   return _react2.default.createElement(
     _list2.default,
@@ -116,6 +121,9 @@ var _pushWrapper = require('./push-wrapper.js');
 var _pushWrapper2 = _interopRequireDefault(_pushWrapper);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+// TODO: in initialization take an sender ID and add it to the sites manifest
+// using the service worker
 
 var key = undefined;
 var queuedRequests = [];
@@ -652,6 +660,31 @@ var handleDoneClicked = function handleDoneClicked(todo) {
   _model2.default.markDone(todo.id);
 };
 
+var handleEditClicked = function handleEditClicked(todo) {
+  // For some reason this needs a timeout otherwise the click fires twice.
+  // Blame react's event system.
+  setTimeout(function () {
+    var remove = confirm('Would you like to delete this aspiration?');
+    console.log(remove);
+    if (remove) {
+      _model2.default.removeTodo(todo.id);
+    }
+    var title = prompt('What do you aspire to do more often?', todo.title);
+    if (title === '' || title === undefined || title === null) {
+      return;
+    }
+    var interval = parseInt(prompt('How many days would you like to wait between doing it?', todo.interval));
+    if (isNaN(interval) || interval === undefined || interval === null) {
+      return;
+    }
+    _model2.default.updateTodo(todo.id, title, interval);
+    // TODO: dim the screen at this point
+    _alarmManager2.default.subscribeDevice().then(function () {
+      console.log('Subscribed for notifications successfully!');
+    });
+  }, 0);
+};
+
 var handleCreateClicked = function handleCreateClicked() {
   // For some reason this needs a timeout otherwise the click fires twice.
   // Blame react's event system.
@@ -683,12 +716,14 @@ var App = function App(props) {
     _react2.default.createElement(_todoList2.default, {
       subheader: 'It\'s time to...',
       todos: props.dueTodos,
-      onDoneClick: handleDoneClicked
+      onDoneClick: handleDoneClicked,
+      onEditClick: handleEditClicked
     }),
     _react2.default.createElement(_todoList2.default, {
       subheader: 'Later',
       todos: props.futureTodos,
-      onDoneClick: handleDoneClicked
+      onDoneClick: handleDoneClicked,
+      onEditClick: handleEditClicked
     }),
     _react2.default.createElement(
       'div',
@@ -750,6 +785,26 @@ var addTodo = function addTodo(title, interval) {
 
   todos.push({ title: title, interval: interval, lastDone: lastDone, id: todos.length });
   notifyListenersOfChange();
+};
+
+var removeTodo = function removeTodo(todoId) {
+  todos = todos.filter(function (todo) {
+    return todo.id !== todoId;
+  });
+  notifyListenersOfChange();
+};
+
+var updateTodo = function updateTodo(todoId, title, interval) {
+  for (var i = 0; i < todos.length; i++) {
+    var todo = todos[i];
+    if (todo.id === todoId) {
+      todo.title = title;
+      todo.interval = interval;
+      notifyListenersOfChange();
+      return;
+    }
+  }
+  throw new Error('Could not find todo to update');
 };
 
 var markDone = function markDone(todoId) {
@@ -842,6 +897,8 @@ var filterDueTodos = function filterDueTodos(todos) {
 module.exports = {
   init: init,
   addTodo: addTodo,
+  removeTodo: removeTodo,
+  updateTodo: updateTodo,
   markDone: markDone,
   addListener: addListener,
   getDueTodos: getDueTodos,

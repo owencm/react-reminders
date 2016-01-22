@@ -28,6 +28,26 @@ const addTodo = (title, interval, lastDone = dates.now()) => {
   notifyListenersOfChange();
 }
 
+const removeTodo = (todoId) => {
+  todos = todos.filter((todo) => {
+    return todo.id !== todoId;
+  })
+  notifyListenersOfChange();
+}
+
+const updateTodo = (todoId, title, interval) => {
+  for (let i = 0; i < todos.length; i++) {
+    let todo = todos[i];
+    if (todo.id === todoId) {
+      todo.title = title;
+      todo.interval = interval;
+      notifyListenersOfChange();
+      return;
+    }
+  }
+  throw new Error('Could not find todo to update');
+}
+
 const markDone = (todoId) => {
   for (let i = 0; i < todos.length; i++) {
     let todo = todos[i];
@@ -114,6 +134,8 @@ const filterDueTodos = (todos) => {
 module.exports = {
   init,
   addTodo,
+  removeTodo,
+  updateTodo,
   markDone,
   addListener,
   getDueTodos,

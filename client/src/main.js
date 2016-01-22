@@ -46,11 +46,39 @@ model.addListener((todos, dueTodos, futureTodos) => {
 import strings from './strings.js';
 import { getDeviceId } from './lib/device-id.js';
 
-let handleDoneClicked = (todo) => {
+const handleDoneClicked = (todo) => {
   model.markDone(todo.id);
 }
 
-let handleCreateClicked = () => {
+const handleEditClicked = (todo) => {
+  // For some reason this needs a timeout otherwise the click fires twice.
+  // Blame react's event system.
+  setTimeout(() => {
+    let remove = confirm('Would you like to delete this aspiration?');
+    console.log(remove);
+    if (remove) {
+      model.removeTodo(todo.id);
+    }
+    let title = prompt('What do you aspire to do more often?', todo.title);
+    if (title === '' || title === undefined || title === null) {
+      return;
+    }
+    let interval = parseInt(
+      prompt('How many days would you like to wait between doing it?',
+              todo.interval)
+    );
+    if (isNaN(interval) || interval === undefined || interval === null) {
+      return;
+    }
+    model.updateTodo(todo.id, title, interval);
+    // TODO: dim the screen at this point
+    alarmManager.subscribeDevice().then(() => {
+      console.log('Subscribed for notifications successfully!');
+    });
+  }, 0);
+}
+
+const handleCreateClicked = () => {
   // For some reason this needs a timeout otherwise the click fires twice.
   // Blame react's event system.
   setTimeout(() => {
@@ -81,11 +109,13 @@ let App = (props) => {
         subheader="It's time to..."
         todos={props.dueTodos}
         onDoneClick={handleDoneClicked}
+        onEditClick={handleEditClicked}
       />
       <TodoList
         subheader="Later"
         todos={props.futureTodos}
         onDoneClick={handleDoneClicked}
+        onEditClick={handleEditClicked}
       />
       <div style={{position: 'fixed', bottom: '16px', right: '16px'}}>
         <FloatingActionButton onTouchTap={handleCreateClicked}>
