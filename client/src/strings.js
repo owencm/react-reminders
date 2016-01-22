@@ -11,7 +11,7 @@ const desiredInterval = (days) => {
     case 30:
       return 'Every month';
     default:
-      throw new Error('Invalid interval specified for todo');
+      return 'Every ' + days + ' days'
   }
 }
 
