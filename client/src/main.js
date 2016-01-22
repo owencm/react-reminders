@@ -25,9 +25,9 @@ serviceWorkerSetup();
 import model from './model.js';
 model.init();
 import alarmManager from './lib/alarm-manager.js';
-// Localhost key
+// Localhost key for sender ID: 653317226796
 // alarmManager.init('AIzaSyBBh4ddPa96rQQNxqiq_qQj7sq1JdsNQUQ');
-// Production key
+// Production key for sender ID: 70689946818
 alarmManager.init('AIzaSyDNlm9R_w_0FDGjSM1fzyx5I5JnJBXACqU');
 model.addListener((todos, dueTodos, futureTodos) => {
   for (let i = 0; i < todos.length; i++) {

@@ -27,7 +27,7 @@
 
 
 /* eslint-disable quotes, comma-spacing */
-var PrecacheConfig = [["/index.html","720dea06b900608d754b727894a193f5"],["/main.js","d418ac3f30a14828f102682089c5cd91"],["/my-service-worker.js","c86e6d22487f5f9763ecfca54cbce9e3"],["/service-worker.js","cc80d3d734ddb542b3fbad48d5c6de61"]];
+var PrecacheConfig = [];
 /* eslint-enable quotes, comma-spacing */
 var CacheNamePrefix = 'sw-precache-v1--' + (self.registration ? self.registration.scope : '') + '-';
 
