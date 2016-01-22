@@ -75,6 +75,8 @@ scheduler.register('todo-caller', notifyClient);
 
 // Server
 
+app.set('port', process.env.PORT || 8080);
+
 app.use(express.static('../client/build'));
 
 app.use(bodyParser.json()); // for parsing application/json
@@ -113,7 +115,7 @@ app.get('/v1/get/:deviceId', function (req, res) {
   res.send(JSON.stringify(getOldestDataByDeviceIdAndRemoveFromStorage(deviceId)));
 })
 
-var server = app.listen(5000, function () {
+var server = app.listen(app.get('port'), function () {
   var host = server.address().address;
   var port = server.address().port;
 
