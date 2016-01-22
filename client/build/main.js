@@ -664,12 +664,12 @@ var handleEditClicked = function handleEditClicked(todo) {
   // For some reason this needs a timeout otherwise the click fires twice.
   // Blame react's event system.
   setTimeout(function () {
-    var remove = confirm('Would you like to delete this aspiration?');
-    console.log(remove);
+    var remove = confirm('Editing: Would you like to delete this aspiration?');
     if (remove) {
       _model2.default.removeTodo(todo.id);
+      return;
     }
-    var title = prompt('What do you aspire to do more often?', todo.title);
+    var title = prompt('Editing: What do you aspire to do more often?', todo.title);
     if (title === '' || title === undefined || title === null) {
       return;
     }
@@ -693,7 +693,7 @@ var handleCreateClicked = function handleCreateClicked() {
     if (title === '' || title === undefined || title === null) {
       return;
     }
-    var interval = parseInt(prompt('How many days would you like to wait between doing it?'));
+    var interval = parseInt(prompt('How many days would you like to wait between doing it?', 30));
     if (isNaN(interval) || interval === undefined || interval === null) {
       return;
     }
