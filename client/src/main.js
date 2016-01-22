@@ -54,12 +54,12 @@ const handleEditClicked = (todo) => {
   // For some reason this needs a timeout otherwise the click fires twice.
   // Blame react's event system.
   setTimeout(() => {
-    let remove = confirm('Would you like to delete this aspiration?');
-    console.log(remove);
+    let remove = confirm('Editing: Would you like to delete this aspiration?');
     if (remove) {
       model.removeTodo(todo.id);
+      return;
     }
-    let title = prompt('What do you aspire to do more often?', todo.title);
+    let title = prompt('Editing: What do you aspire to do more often?', todo.title);
     if (title === '' || title === undefined || title === null) {
       return;
     }
@@ -86,7 +86,7 @@ const handleCreateClicked = () => {
     if (title === '' || title === undefined || title === null) {
       return;
     }
-    let interval = parseInt(prompt('How many days would you like to wait between doing it?'));
+    let interval = parseInt(prompt('How many days would you like to wait between doing it?', 30));
     if (isNaN(interval) || interval === undefined || interval === null) {
       return;
     }

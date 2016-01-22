@@ -1,8 +1,8 @@
 {
-  "name": "react-boilerplate",
+  "name": "react-reminders",
   "version": "1.0.0",
   "description": "",
-  "main": "gulpfile.js",
+  "main": "server/server.js",
   "dependencies": {
     "babel": "^6.3.26",
     "babel-core": "^6.3.26",
@@ -22,20 +22,22 @@
     "react": "^0.14.5",
     "react-dom": "^0.14.5",
     "react-tap-event-plugin": "^0.2.1",
+    "sw-precache": "^2.3.0",
     "vinyl-source-stream": "^1.1.0"
   },
   "devDependencies": {},
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server/server.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/owencm/react-boilerplate.git"
+    "url": "git+https://github.com/owencm/react-reminders.git"
   },
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/owencm/react-boilerplate/issues"
+    "url": "https://github.com/owencm/react-reminders/issues"
   },
-  "homepage": "https://github.com/owencm/react-boilerplate#readme"
+  "homepage": "https://github.com/owencm/react-reminders#readme"
 }
