@@ -25,7 +25,10 @@ serviceWorkerSetup();
 import model from './model.js';
 model.init();
 import alarmManager from './lib/alarm-manager.js';
-alarmManager.init('AIzaSyBBh4ddPa96rQQNxqiq_qQj7sq1JdsNQUQ');
+// Localhost key
+// alarmManager.init('AIzaSyBBh4ddPa96rQQNxqiq_qQj7sq1JdsNQUQ');
+// Production key
+alarmManager.init('AIzaSyDNlm9R_w_0FDGjSM1fzyx5I5JnJBXACqU');
 model.addListener((todos, dueTodos, futureTodos) => {
   for (let i = 0; i < todos.length; i++) {
     let todo = todos[i];
@@ -64,9 +67,10 @@ const handleEditClicked = (todo) => {
       return;
     }
     let interval = parseInt(
-      prompt('How many days would you like to wait between doing it?',
+      prompt('Editing: How many days would you like to wait between doing it?',
               todo.interval)
     );
+    console.log(interval);
     if (isNaN(interval) || interval === undefined || interval === null) {
       return;
     }

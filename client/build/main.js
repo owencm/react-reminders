@@ -640,7 +640,10 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 _model2.default.init();
 
-_alarmManager2.default.init('AIzaSyBBh4ddPa96rQQNxqiq_qQj7sq1JdsNQUQ');
+// Localhost key
+// alarmManager.init('AIzaSyBBh4ddPa96rQQNxqiq_qQj7sq1JdsNQUQ');
+// Production key
+_alarmManager2.default.init('AIzaSyDNlm9R_w_0FDGjSM1fzyx5I5JnJBXACqU');
 _model2.default.addListener(function (todos, dueTodos, futureTodos) {
   for (var i = 0; i < todos.length; i++) {
     var todo = todos[i];
@@ -673,7 +676,8 @@ var handleEditClicked = function handleEditClicked(todo) {
     if (title === '' || title === undefined || title === null) {
       return;
     }
-    var interval = parseInt(prompt('How many days would you like to wait between doing it?', todo.interval));
+    var interval = parseInt(prompt('Editing: How many days would you like to wait between doing it?', todo.interval));
+    console.log(interval);
     if (isNaN(interval) || interval === undefined || interval === null) {
       return;
     }
