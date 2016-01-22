@@ -162,7 +162,7 @@ var sendToServer = function sendToServer(path, body) {
   });
 };
 
-var set = function set(tag, targetTime, interval) {
+var set = function set(tag, targetTime, interval, data) {
   if (key === undefined) {
     throw new Error('You must initialize alarm-manager with an API key before\n      calling set.');
   }
@@ -172,9 +172,11 @@ var set = function set(tag, targetTime, interval) {
     // Note the subscription ID gets added when the queue is flushed
     addToQueue('/v1/set', {
       key: key,
-      tag: tag + '.' + deviceId,
+      tag: tag,
+      deviceId: deviceId,
       targetTime: targetTime,
-      interval: interval
+      interval: interval,
+      data: data
     });
   });
 };
@@ -637,7 +639,12 @@ _model2.default.addListener(function (todos, dueTodos, futureTodos) {
     var interval = todo.interval * 24 * 60 * 60 * 1000;
     var targetTime = todo.lastDone + interval;
     var tag = todo.id;
-    _alarmManager2.default.set(tag, targetTime, interval);
+    var notificationTitle = todo.title;
+    var notificationBody = _strings2.default.todoIntervalAndLastDone(todo.interval, todo.lastDone);
+    _alarmManager2.default.set(tag, targetTime, interval, {
+      title: notificationTitle,
+      body: notificationBody
+    });
   }
 });
 

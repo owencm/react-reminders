@@ -1,292 +1,96 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-"use strict";
+'use strict';
 
-var now = function now() {
-  return Date.now();
+var _deviceId = require('./device-id.js');
+
+var listeners = [];
+
+var addListener = function addListener(callback) {
+  listeners.push(callback);
 };
 
-var daysBetween = function daysBetween(dateA, dateB) {
-  return Math.round(Math.abs(dateA - dateB) / (1000 * 60 * 60 * 24));
+var notifyListeners = function notifyListeners(data) {
+  listeners.map(function (listener) {
+    return listener(data);
+  });
 };
 
-var daysSince = function daysSince(date) {
-  return daysBetween(date, now());
-};
+self.addEventListener('push', function (event) {
+  console.log('Received a push message', event);
+  (0, _deviceId.getDeviceId)().then(function (deviceId) {
+    return fetch('v1/get/' + deviceId);
+  }).then(function (resp) {
+    if (resp.status !== 200) {
+      throw new Error('Could not ping alarm server');
+    }
+    return resp.json();
+  }).then(function (data) {
+    notifyListeners(data);
+  });
+});
 
-module.exports = {
-  now: now, daysBetween: daysBetween, daysSince: daysSince
-};
+module.exports = { addListener: addListener };
 
-},{}],2:[function(require,module,exports){
+},{"./device-id.js":2}],2:[function(require,module,exports){
 'use strict';
 
 var _localforage = require('localforage');
 
 var _localforage2 = _interopRequireDefault(_localforage);
 
-var _dates = require('./dates.js');
-
-var _dates2 = _interopRequireDefault(_dates);
-
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-var lf = _localforage2.default; // TODO: Find a nicer way to handle the generation of dueTodos and futureTodos etc
+var lf = _localforage2.default;
 
-var listeners = [];
-var ready = false;
-
-var addListener = function addListener(listener) {
-  listeners.push(listener);
-};
-
-var notifyListenersOfChange = function notifyListenersOfChange() {
-  var dueTodos = filterDueTodos(todos);
-  var futureTodos = filterFutureTodos(todos);
-  listeners.map(function (listener) {
-    return notifyListenerOfChange(listener, todos, dueTodos, futureTodos);
-  });
-};
-
-var notifyListenerOfChange = function notifyListenerOfChange(listener, todos, dueTodos, futureTodos) {
-  listener(todos, dueTodos, futureTodos);
-};
-
-var todos = undefined;
-
-var addTodo = function addTodo(title, interval) {
-  var lastDone = arguments.length <= 2 || arguments[2] === undefined ? _dates2.default.now() : arguments[2];
-
-  todos.push({ title: title, interval: interval, lastDone: lastDone, id: todos.length });
-  notifyListenersOfChange();
-};
-
-var markDone = function markDone(todoId) {
-  for (var i = 0; i < todos.length; i++) {
-    var todo = todos[i];
-    if (todo.id === todoId) {
-      todo.lastDone = _dates2.default.now();
-      notifyListenersOfChange();
-      return;
-    }
-  }
-  throw new Error('Could not find todo to mark done');
-};
-
-var getDueTodos = function getDueTodos() {
-  if (!ready) {
-    throw new Error('Tried to access todos before it was loaded');
-  }
-  return filterDueTodos(todos);
-};
-
-var getFutureTodos = function getFutureTodos() {
-  if (!ready) {
-    throw new Error('Tried to access todos before it was loaded');
-  }
-  return filterFutureTodos(todos);
-};
-
-var init = function init() {
-  console.log('initializing the model');
-  todos = [];
-
-  lf.ready()
-  // .then(() => lf.setItem('todos', null))
-  .then(function () {
-    return lf.getItem('todos');
-  }).then(function (storedTodos) {
-    if (storedTodos === null) {
-      ready = true;
-      addTodo('Call Mum', 7, 0);
-      addTodo('Deep clean the kitchen', 14);
+var getDeviceId = function getDeviceId() {
+  return lf.ready().then(function () {
+    return lf.getItem('deviceId');
+  }).then(function (id) {
+    // If we've never created one before, create it and return it
+    if (id === null) {
+      (function () {
+        var randId = Math.random() + '';
+        lf.setItem('deviceId', randId).then(function () {
+          return randId;
+        });
+      })();
     } else {
-      todos = storedTodos;
-      ready = true;
-      notifyListenersOfChange();
+      return lf.getItem('deviceId');
     }
-    // Do this only after we've restored todos to avoid race conditions
-    addListener(function () {
-      lf.ready().then(function () {
-        return lf.setItem('todos', todos);
-      });
-    });
-  }).catch(function (e) {
-    console.error(e);
   });
-
-  // setInterval(() => {
-  //   todos.map((todo) => { todo.lastDone -= 24*60*60*1000 });
-  //   notifyListenersOfChange();
-  // }, 10000);
 };
 
-// Stateless helpers
+module.exports = { getDeviceId: getDeviceId };
 
-var filterFutureTodos = function filterFutureTodos(todos) {
-  var futureTodos = [];
-  for (var i = 0; i < todos.length; i++) {
-    var todo = todos[i];
-    if (_dates2.default.daysSince(todo.lastDone) < todo.interval) {
-      futureTodos.push(todo);
-    }
-  }
-  return futureTodos;
-};
-
-var filterDueTodos = function filterDueTodos(todos) {
-  if (!ready) {
-    console.error('Tried to read a todo before they were loaded');
-  }
-  var dueTodos = [];
-  for (var i = 0; i < todos.length; i++) {
-    var todo = todos[i];
-    if (_dates2.default.daysSince(todo.lastDone) >= todo.interval) {
-      dueTodos.push(todo);
-    }
-  }
-  return dueTodos;
-};
-
-module.exports = {
-  init: init,
-  addTodo: addTodo,
-  markDone: markDone,
-  addListener: addListener,
-  getDueTodos: getDueTodos,
-  getFutureTodos: getFutureTodos
-};
-
-},{"./dates.js":1,"localforage":5}],3:[function(require,module,exports){
+},{"localforage":4}],3:[function(require,module,exports){
 'use strict';
 
-var _model = require('./model.js');
+var _alarmManagerSw = require('./lib/alarm-manager-sw.js');
 
-var _model2 = _interopRequireDefault(_model);
-
-var _strings = require('./strings.js');
-
-var _strings2 = _interopRequireDefault(_strings);
+var _alarmManagerSw2 = _interopRequireDefault(_alarmManagerSw);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-// App code
-
-var getNotifications = function getNotifications() {
-    return new Promise(function (resolve, reject) {
-        _model2.default.init();
-        // Hack to ensure todos are loaded. TODO: Fix me
-        setTimeout(function () {
-            var dueTodos = _model2.default.getDueTodos();
-            var todo = dueTodos[0];
-            var title = 'Aspire: Why not add a new aspiration today?';
-            var body = '';
-            if (todo) {
-                title = 'Apire: ' + todo.title;
-                var todoIntervalAndLastDone = _strings2.default.todoIntervalAndLastDone(todo.interval, todo.lastDone);
-                body = todoIntervalAndLastDone;
-            }
-            var icon = 'TODO.png';
-            var urlToOpen = 'http://www.google.com/';
-            resolve([{ title: title, body: body, icon: icon, urlToOpen: urlToOpen }]);
-        }, 1000);
-    });
-};
+_alarmManagerSw2.default.addListener(function (data) {
+    var title = data.title;
+    var body = data.body;
+    var notificationOptions = {
+        body: body,
+        icon: 'icon.png',
+        tag: title + body
+    };
+    return self.registration.showNotification(title, notificationOptions);
+});
 
 // Library code
 
-var showNotification = function showNotification(title, body, icon, data) {
-    console.log('showNotification');
-    var notificationOptions = {
-        body: body,
-        icon: icon,
-        tag: 'static-yo',
-        data: data
-    };
-    return self.registration.showNotification(title, notificationOptions);
-};
-
-self.addEventListener('push', function (event) {
-    console.log('Received a push message', event);
-    event.waitUntil(getNotifications().then(function (notifications) {
-        // TODO: Handle multiple notifications
-        var notification = notifications[0];
-        var notificationData = { url: notification.urlToOpen };
-        return showNotification(notification.title, notification.body, notification.icon, notificationData);
-    }).catch(function (err) {
-        console.error('A Problem occured with handling the push msg', err);
-        var title = 'An error occured';
-        var message = '';
-        return showNotification(title, message);
-    }));
-});
-
 self.addEventListener('notificationclick', function (event) {
-    var url = event.notification.data.url;
+    var url = 'http://localhost:8080/';
     event.notification.close();
     event.waitUntil(clients.openWindow(url));
 });
 
-// fetch(YAHOO_WEATHER_API_ENDPOINT).then(response => {
-// if (response.status !== 200) {
-//     // Throw an error so the promise is rejected and catch() is executed
-//     throw new Error(`Invalid status code from weather API: ${ response.status }`);
-// }
-// Examine the text in the response
-//     return response.json();
-// }).then(data => {
-
-},{"./model.js":2,"./strings.js":4}],4:[function(require,module,exports){
-'use strict';
-
-var _dates = require('./dates.js');
-
-var _dates2 = _interopRequireDefault(_dates);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var desiredInterval = function desiredInterval(days) {
-  switch (days) {
-    case 1:
-      return 'Every day';
-    case 7:
-      return 'Every week';
-    case 14:
-      return 'Every two weeks';
-    case 30:
-      return 'Every month';
-    default:
-      throw new Error('Invalid interval specified for todo');
-  }
-};
-
-var lastDone = function lastDone(days) {
-  if (days < 1) {
-    return 'just now';
-  } else if (days < 2) {
-    return 'yesterday';
-  } else if (days < 7) {
-    return 'this week';
-  } else if (days < 14) {
-    return 'one week ago';
-  } else if (days < 30) {
-    return 'this month';
-  } else if (days < 60) {
-    return 'one month ago';
-  } else {
-    return 'a long time ago';
-  }
-};
-
-var todoIntervalAndLastDone = function todoIntervalAndLastDone(todoInterval, todoLastDone) {
-  var daysSinceLastDone = _dates2.default.daysSince(todoLastDone);
-  return desiredInterval(todoInterval) + ', last done ' + lastDone(daysSinceLastDone);
-};
-
-module.exports = {
-  todoIntervalAndLastDone: todoIntervalAndLastDone
-};
-
-},{"./dates.js":1}],5:[function(require,module,exports){
+},{"./lib/alarm-manager-sw.js":1}],4:[function(require,module,exports){
 (function (process,global){
 /*!
     localForage -- Offline Storage, Improved
@@ -3125,7 +2929,7 @@ return /******/ (function(modules) { // webpackBootstrap
 });
 ;
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"_process":6}],6:[function(require,module,exports){
+},{"_process":5}],5:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};

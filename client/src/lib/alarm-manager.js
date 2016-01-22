@@ -44,7 +44,7 @@ const sendToServer = (path, body) => {
   }).then((resp) => { console.log('Server responded:', resp) })
 }
 
-const set = (tag, targetTime, interval) => {
+const set = (tag, targetTime, interval, data) => {
   if (key === undefined) {
     throw new Error(`You must initialize alarm-manager with an API key before
       calling set.`)
@@ -54,10 +54,12 @@ const set = (tag, targetTime, interval) => {
   getDeviceId().then((deviceId) => {
     // Note the subscription ID gets added when the queue is flushed
     addToQueue('/v1/set', {
-      key: key,
-      tag: tag + '.' + deviceId,
+      key,
+      tag,
+      deviceId,
       targetTime,
-      interval
+      interval,
+      data
     });
   });
 }

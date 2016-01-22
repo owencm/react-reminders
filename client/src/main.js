@@ -32,7 +32,15 @@ model.addListener((todos, dueTodos, futureTodos) => {
     let interval = todo.interval * 24*60*60*1000;
     let targetTime = todo.lastDone + interval;
     let tag = todo.id;
-    alarmManager.set(tag, targetTime, interval);
+    let notificationTitle = todo.title;
+    let notificationBody = strings.todoIntervalAndLastDone(
+                                                            todo.interval,
+                                                            todo.lastDone
+                                                          );
+    alarmManager.set(tag, targetTime, interval, {
+      title: notificationTitle,
+      body: notificationBody
+    });
   }
 });
 import strings from './strings.js';
