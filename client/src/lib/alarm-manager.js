@@ -25,6 +25,7 @@ flushQueueIfSubscriptionAvailable();
 
 // These will be sent when flushQueue is called, and they will have subscription
 // added to body
+// TODO: clobber queued requests with the same tag
 const addToQueue = (path, body) => {
   queuedRequests.push({path, body});
   flushQueueIfSubscriptionAvailable();
@@ -67,10 +68,22 @@ const set = (tag, targetTime, interval, data) => {
   });
 }
 
+const unset = (tag) => {
+  // Send to the server scheduling information, keyed by a device ID and the todo ID
+  // so if the todo changes we can clear the previous schedule on the server
+  getDeviceId().then((deviceId) => {
+    // Note the subscription ID gets added when the queue is flushed
+    addToQueue('/v1/unset', {
+      tag,
+      deviceId
+    });
+  });
+}
+
 const init = (aPIKey) => {
   key = aPIKey;
 }
 
 const subscribeDevice = pushWrapper.subscribeDevice;
 
-module.exports = { set, init, subscribeDevice };
+module.exports = { set, unset, init, subscribeDevice };

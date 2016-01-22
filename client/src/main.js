@@ -29,13 +29,18 @@ import alarmManager from './lib/alarm-manager.js';
 // alarmManager.init('AIzaSyBBh4ddPa96rQQNxqiq_qQj7sq1JdsNQUQ');
 // Production key for sender ID: 70689946818
 alarmManager.init('AIzaSyDNlm9R_w_0FDGjSM1fzyx5I5JnJBXACqU');
-model.addListener((todos, dueTodos, futureTodos) => {
+model.addListener((todos, dueTodos, futureTodos, removedTodos) => {
+  for (let i = 0; i < removedTodos.length; i++) {
+    let todo = removedTodos[i];
+    let tag = todo.id;
+    alarmManager.unset(tag);
+  }
   for (let i = 0; i < todos.length; i++) {
     let todo = todos[i];
     let interval = todo.interval * 24*60*60*1000;
     let targetTime = todo.lastDone + interval;
     let tag = todo.id;
-    let notificationTitle = todo.title;
+    let notificationTitle = 'Aspire: ' + todo.title;
     let notificationBody = strings.todoIntervalAndLastDone(
                                                             todo.interval,
                                                             todo.lastDone
@@ -77,6 +82,13 @@ const handleEditClicked = (todo) => {
     }
     model.updateTodo(todo.id, title, interval);
     // TODO: dim the screen at this point
+    alarmManager.hasPermission().then((permissionEnabled) => {
+      alarmManager.subscribeDevice().then(() => {
+        if (!permissionEnabled) {
+          new Notification('Aspire', {body: 'Notifications now enabled'});
+        }
+      });
+    })
     alarmManager.subscribeDevice();
   }, 0);
 }

@@ -11,29 +11,34 @@ const addListener = (listener) => {
   listeners.push(listener);
 }
 
-const notifyListenersOfChange = () => {
+const notifyListenersOfChange = (removedTodos = []) => {
   let dueTodos = filterDueTodos(todos);
   let futureTodos = filterFutureTodos(todos);
-  listeners.map((listener) => notifyListenerOfChange(listener, todos, dueTodos, futureTodos));
+  listeners.map((listener) => notifyListenerOfChange(listener, todos, dueTodos, futureTodos, removedTodos));
 }
 
-const notifyListenerOfChange = (listener, todos, dueTodos, futureTodos) => {
-  listener(todos, dueTodos, futureTodos);
+const notifyListenerOfChange = (listener, todos, dueTodos, futureTodos, removedTodos) => {
+  listener(todos, dueTodos, futureTodos, removedTodos);
 }
 
 let todos;
 
 const addTodo = (title, interval, lastDone = dates.now()) => {
-  todos.push({title, interval, lastDone, id: todos.length});
+  let id = Math.floor(Math.random() * 10000000000)
+  todos.push({title, interval, lastDone, id: id});
   notifyListenersOfChange();
 }
 
 // TODO: find a way to pass removed TODOs to the server
 const removeTodo = (todoId) => {
+  let removedTodo;
   todos = todos.filter((todo) => {
+    if (todo.id === todoId) {
+      removedTodo = todo;
+    }
     return todo.id !== todoId;
   })
-  notifyListenersOfChange();
+  notifyListenersOfChange([removedTodo]);
 }
 
 const updateTodo = (todoId, title, interval) => {

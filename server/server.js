@@ -111,6 +111,18 @@ app.post('/v1/set', jsonParser, function (req, res) {
   res.sendStatus(200);
 });
 
+app.post('/v1/unset', jsonParser, function (req, res) {
+  console.log('Requested we remove:', req.body);
+  // Get the deviceId so when the client tries to fetch the data we know what
+  // to provide
+  var deviceId = req.body.deviceId;
+  // Get the tag so we can replace older persisted intervals
+  var tag = req.body.tag + deviceId;
+  // TODO: Fix this hacky removal by actually removing, not just replacing
+  scheduler.setPersistentBigInterval('todo-caller', {}, tag, 999999999999, 999999999999);
+  res.sendStatus(200);
+});
+
 app.get('/v1/get/:deviceId', function (req, res) {
   var deviceId = req.params.deviceId;
   res.send(JSON.stringify(getOldestDataByDeviceIdAndRemoveFromStorage(deviceId)));
