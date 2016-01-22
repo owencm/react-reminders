@@ -1,3 +1,5 @@
 {
-  "gcm_sender_id": "653317226796"
+  "name": "Aspire",
+  "gcm_sender_id": "653317226796",
+  "display": "standalone"
 }
