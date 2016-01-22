@@ -113,7 +113,7 @@ app.get('/v1/get/:deviceId', function (req, res) {
   res.send(JSON.stringify(getOldestDataByDeviceIdAndRemoveFromStorage(deviceId)));
 })
 
-var server = app.listen(8080, function () {
+var server = app.listen(5000, function () {
   var host = server.address().address;
   var port = server.address().port;
 
