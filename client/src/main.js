@@ -66,7 +66,8 @@ const handleEditClicked = (todo) => {
     if (title === '' || title === undefined || title === null) {
       return;
     }
-    let interval = parseInt(
+    // Note we parse floats so it's easy to test with days = 0.00007
+    let interval = parseFloat(
       prompt('Editing: How many days would you like to wait between doing it?',
               todo.interval)
     );
@@ -90,7 +91,8 @@ const handleCreateClicked = () => {
     if (title === '' || title === undefined || title === null) {
       return;
     }
-    let interval = parseInt(prompt('How many days would you like to wait between doing it?', 30));
+    // Note we parse floats so it's easy to test with days = 0.00007
+    let interval = parseFloat(prompt('How many days would you like to wait between doing it?', 30));
     if (isNaN(interval) || interval === undefined || interval === null) {
       return;
     }
