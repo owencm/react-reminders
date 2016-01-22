@@ -4,6 +4,7 @@ var bodyParser = require('body-parser');
 var jsonParser = bodyParser.json();
 var scheduler = require('./lib/interval-scheduler.js');
 var gcm = require('node-gcm');
+var path = require("path");
 var storage = require('node-persist');
 storage.initSync();
 
@@ -77,7 +78,7 @@ scheduler.register('todo-caller', notifyClient);
 
 app.set('port', process.env.PORT || 8080);
 
-app.use(express.static('../client/build'));
+app.use(express.static(path.join(__dirname,'../', 'client/build')));
 
 app.use(bodyParser.json()); // for parsing application/json
 
