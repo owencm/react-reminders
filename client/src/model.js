@@ -28,6 +28,7 @@ const addTodo = (title, interval, lastDone = dates.now()) => {
   notifyListenersOfChange();
 }
 
+// TODO: find a way to pass removed TODOs to the server
 const removeTodo = (todoId) => {
   todos = todos.filter((todo) => {
     return todo.id !== todoId;
