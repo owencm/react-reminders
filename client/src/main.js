@@ -24,11 +24,14 @@ serviceWorkerSetup();
 
 import model from './model.js';
 model.init();
+
 import alarmManager from './lib/alarm-manager.js';
 // Localhost key for sender ID: 653317226796
 // alarmManager.init('AIzaSyBBh4ddPa96rQQNxqiq_qQj7sq1JdsNQUQ');
 // Production key for sender ID: 70689946818
 alarmManager.init('AIzaSyDNlm9R_w_0FDGjSM1fzyx5I5JnJBXACqU');
+
+// When something changes in the model, make sure the alarms are updated
 model.addListener((todos, dueTodos, futureTodos, removedTodos) => {
   for (let i = 0; i < removedTodos.length; i++) {
     let todo = removedTodos[i];
@@ -83,13 +86,12 @@ const handleEditClicked = (todo) => {
     model.updateTodo(todo.id, title, interval);
     // TODO: dim the screen at this point
     alarmManager.hasPermission().then((permissionEnabled) => {
-      alarmManager.subscribeDevice().then(() => {
-        if (!permissionEnabled) {
+      if (!permissionEnabled) {
+        alarmManager.requestPermission().then(() => {
           new Notification('Aspire', {body: 'Notifications now enabled'});
-        }
-      });
-    })
-    alarmManager.subscribeDevice();
+        });
+      }
+    });
   }, 0);
 }
 
@@ -108,8 +110,12 @@ const handleCreateClicked = () => {
     }
     model.addTodo(title, interval);
     // TODO: dim the screen at this point
-    alarmManager.subscribeDevice().then(() => {
-      console.log('Subscribed for notifications successfully!');
+    alarmManager.hasPermission().then((permissionEnabled) => {
+      if (!permissionEnabled) {
+        alarmManager.requestPermission().then(() => {
+          new Notification('Aspire', {body: 'Notifications now enabled'});
+        });
+      }
     });
   }, 0);
 }

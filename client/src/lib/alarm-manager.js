@@ -82,8 +82,16 @@ const unset = (tag) => {
 
 const init = (aPIKey) => {
   key = aPIKey;
+  // TODO: dim the screen at this point
+  pushWrapper.hasPermission().then((permissionEnabled) => {
+    if (permissionEnabled) {
+      pushWrapper.subscribeDevice();
+    }
+  });
 }
 
-const subscribeDevice = pushWrapper.subscribeDevice;
+const requestPermission = pushWrapper.subscribeDevice;
 
-module.exports = { set, unset, init, subscribeDevice };
+const hasPermission = pushWrapper.hasPermission;
+
+module.exports = { set, unset, init, requestPermission, hasPermission };
