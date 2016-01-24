@@ -1,0 +1,10 @@
+{
+  "applications": {
+    "_default": {
+      "link": "react-reminders"
+    },
+    "react-reminders": {
+      "applicationId": "ZqfKAmPjdMdNkzJV4ZAGZC2odz2BPjTaIlJRBeOF"
+    }
+  }
+}

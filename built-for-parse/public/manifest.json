@@ -1,0 +1,9 @@
+{
+  "name": "Aspire",
+  "short_name": "Aspire",
+  "start_url": "/",
+  "gcm_sender_id": "70689946818",
+  "background_color": "#00bcd4",
+  "theme_color": "#00bcd4",
+  "display": "standalone"
+}
