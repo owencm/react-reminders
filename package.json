@@ -12,6 +12,7 @@
     "body-parser": "^1.14.2",
     "browserify": "^12.0.1",
     "express": "^4.13.3",
+    "firebase": "^2.4.0",
     "gulp": "^3.9.0",
     "gulp-babel": "^6.1.1",
     "gulp-browserify": "^0.5.1",

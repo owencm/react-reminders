@@ -1,3 +1,7 @@
+Parse.Cloud.Run('hello', {}).then((result) => {
+  console.log(result);
+});
+
 // TODO: resubscribe every time the page is loaded if we still have permission
 
 import React from 'react';
