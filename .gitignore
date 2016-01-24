@@ -29,5 +29,6 @@ node_modules
 # OSX files
 .DS_Store
 
-# Persisted intervals
-server/persist
+# Built files (note don't exclude the whole folder as it has hidden .parse files)
+built-for-parse/client
+built-for-parse/cloud
