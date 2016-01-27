@@ -3,24 +3,27 @@ let log = (...msgs) => {
 }
 
 Parse.Cloud.define('scheduleNotification', (req, resp) => {
-  let { startTime, data } = req.params;
+  // let { startTime, data } = req.params;
   // log(req.body);
-  log('Scheduling a notification in response to ', req.body, 'to be shown at', startTime, 'and include', data);
+  // log('Scheduling a notification in response to ', req.body, 'to be shown at', startTime, 'and include', data);
   // TODO: write data somewhere
   // TODO: Schedule a notification
-  // Parse.Push.send({
-  //   data: {
-  //     alert: "This is my first push"
-  //   }
-  // }, {
-  //   success: function() {
-  //     // Push was successful
-  //   },
-  //   error: function(error) {
-  //     // Handle error
-  //   }
-  // });
-  resp.success();
+
+  let thisUserQuery = new Parse.Query(Parse.Installation);
+  Parse.Push.send({
+    where: thisUserQuery,
+    data: {
+      alert: "New Ticket Added",
+      sound: "default"
+    }
+  },{
+    success: () => {
+      response.success('true');
+    },
+    error: (error) => {
+      response.error(error);
+    }
+  });
 });
 
 Parse.Cloud.define('setDeviceToken', (req, resp) => {

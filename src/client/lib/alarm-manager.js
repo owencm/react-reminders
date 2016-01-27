@@ -1,85 +1,105 @@
 // TODO: in initialization take an sender ID and add it to the sites manifest
 // using the service worker
 
-import { getDeviceId } from './device-id.js';
+import Parse from 'parse';
+
+Parse.initialize('ZqfKAmPjdMdNkzJV4ZAGZC2odz2BPjTaIlJRBeOF', 'e2VWvnFULHByDWnywBemHM4JhvKHmdrEuuKvtBJw');
+window.Parse = Parse;
+
 import pushWrapper from './push-wrapper.js';
 
-let queuedRequests = [];
+Parse.Cloud.run('scheduleNotification', {}).then((result) => {
+  console.log(result);
+});
 
-let flushQueueIfSubscriptionAvailable = (subscription) => {
-  flushQueue(subscription.endpoint);
+
+
+import localforage from 'localforage';
+const lf = localforage;
+
+const subscribeWithParse = (deviceToken) => {
+  let installation = new Parse.Installation;
+
+  // For some reason we need to manually add this to the installation before
+  // saving
+  Parse._getInstallationId().then((installationId) => {
+    lf.ready().then(() => lf.setItem('installationId', installationId));
+    installation.set({
+      deviceToken: deviceToken,
+      pushType: 'gcm',
+      deviceType: 'android',
+      GCMSenderId: '70689946818',
+      installationId: installationId
+    });
+    return installation.save();
+  });
 }
-
-pushWrapper.addSubscriptionChangeListener(flushQueueIfSubscriptionAvailable);
 
 pushWrapper.getSubscription().then((subscription) => {
   if (subscription) {
-    flushQueueIfSubscriptionAvailable(subscription.endpoint);
+    let endpoint = subscription.endpoint;
+    let deviceToken = endpoint.slice(40, endpoint.length);
+    subscribeWithParse(deviceToken);
   }
 });
 
-pushWrapper.hasPermission().then((permissionGranted) => {
-  if (permissionGranted) {
-    pushWrapper.subscribeDevice();
-  }
-});
-
-// These will be sent when flushQueue is called, and they will have subscription
-// added to body
-// TODO: clobber queued requests with the same tag
-const addToQueue = (path, body) => {
-  queuedRequests.push({path, body});
-  flushQueueIfSubscriptionAvailable();
-}
-
-const flushQueue = (subscription) => {
-  for (let i = 0; i < queuedRequests.length; i++) {
-    let req = queuedRequests[i];
-    req.body.subscription = subscription;
-    sendToServer(req.path, req.body);
-  }
-  queuedRequests = [];
-}
-
-const sendToServer = (path, body) => {
-  fetch(path, {
-    method: 'POST',
-    body: JSON.stringify(body),
-    headers: new Headers({'Content-Type': 'application/json'})
-  }).then((resp) => { console.log('Server responded:', resp) })
-}
-
-const set = (tag, targetTime, interval, data) => {
-  if (key === undefined) {
-    throw new Error(`You must initialize alarm-manager with an API key before
-      calling set.`)
-  }
-  // Send to the server scheduling information, keyed by a device ID and the todo ID
-  // so if the todo changes we can clear the previous schedule on the server
-  getDeviceId().then((deviceId) => {
-    // Note the subscription ID gets added when the queue is flushed
-    addToQueue('/v1/set', {
-      key,
-      tag,
-      deviceId,
-      targetTime,
-      interval,
-      data
-    });
-  });
-}
-
-const unset = (tag) => {
-  // Send to the server scheduling information, keyed by a device ID and the todo ID
-  // so if the todo changes we can clear the previous schedule on the server
-  getDeviceId().then((deviceId) => {
-    // Note the subscription ID gets added when the queue is flushed
-    addToQueue('/v1/unset', {
-      tag,
-      deviceId
-    });
-  });
-}
+// let queue = [];
+//
+// pushWrapper.addSubscriptionChangeListener(flushQueue);
+//
+// const flushQueueIfSubscriptionAvailable = () => {
+//   pushWrapper.getSubscription().then((subscription) => {
+//     if (subscription) {
+//       flushQueue(subscription);
+//     }
+//   });
+// }
+//
+// flushQueueIfSubscriptionAvailable();
+//
+// pushWrapper.hasPermission().then((permissionGranted) => {
+//   if (permissionGranted) {
+//     pushWrapper.subscribeDevice();
+//   }
+// });
+//
+// // These will be sent when flushQueue is called, and they will have subscription
+// // added to body
+// // TODO: clobber queued requests with the same tag
+// const addToQueue = (body) => {
+//   queue.push(body);
+//   flushQueueIfSubscriptionAvailable();
+// }
+//
+// const flushQueue = ({ endpoint }) => {
+//   for (let i = 0; i < queue.length; i++) {
+//     let task = queue[i];
+//
+//   }
+//   queue = [];
+// }
+//
+// const set = (tag, targetTime, interval, data) => {
+//   // Note the subscription ID gets added when the queue is flushed
+//   addToQueue({
+//     action: 'set',
+//     tag,
+//     targetTime,
+//     interval,
+//     data
+//   });
+// }
+//
+// const unset = (tag) => {
+//   // Send to the server scheduling information, keyed by a device ID and the todo ID
+//   // so if the todo changes we can clear the previous schedule on the server
+//   // Note the subscription ID gets added when the queue is flushed
+//   addToQueue({
+//     action: 'unset',
+//     tag,
+//     deviceId
+//   });
+// }
 
 const init = () => {
   // TODO: dim the screen at this point

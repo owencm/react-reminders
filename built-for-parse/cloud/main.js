@@ -10,33 +10,33 @@ var log = function log() {
 };
 
 Parse.Cloud.define('scheduleNotification', function (req, resp) {
-  var _req$params = req.params;
-  var startTime = _req$params.startTime;
-  var data = _req$params.data;
+  // let { startTime, data } = req.params;
   // log(req.body);
-
-  log('Scheduling a notification in response to ', req.body, 'to be shown at', startTime, 'and include', data);
+  // log('Scheduling a notification in response to ', req.body, 'to be shown at', startTime, 'and include', data);
   // TODO: write data somewhere
   // TODO: Schedule a notification
-  // Parse.Push.send({
-  //   data: {
-  //     alert: "This is my first push"
-  //   }
-  // }, {
-  //   success: function() {
-  //     // Push was successful
-  //   },
-  //   error: function(error) {
-  //     // Handle error
-  //   }
-  // });
-  resp.success();
+
+  var thisUserQuery = new Parse.Query(Parse.Installation);
+  Parse.Push.send({
+    where: thisUserQuery,
+    data: {
+      alert: "New Ticket Added",
+      sound: "default"
+    }
+  }, {
+    success: function success() {
+      response.success('true');
+    },
+    error: function error(_error) {
+      response.error(_error);
+    }
+  });
 });
 
 Parse.Cloud.define('setDeviceToken', function (req, resp) {
-  var _req$params2 = req.params;
-  var deviceToken = _req$params2.deviceToken;
-  var userId = _req$params2.userId;
+  var _req$params = req.params;
+  var deviceToken = _req$params.deviceToken;
+  var userId = _req$params.userId;
 
   Parse.Cloud.useMasterKey('tc5jozG8ZZZPbR1wFFNKDrAqnYejEqjMEIFVx2Ik');
   var user = new Parse.User();
@@ -56,15 +56,15 @@ Parse.Cloud.define('setDeviceToken', function (req, resp) {
           // All the installations were saved.
           response.success("All the installations were updated with new deviceTokens.");
         },
-        error: function error(_error) {
+        error: function error(_error2) {
           // An error occurred while saving one of the objects.
-          console.error(_error);
+          console.error(_error2);
           response.error("An error occurred while updating this user's installations.");
         }
       });
     },
-    error: function error(_error2) {
-      console.error(_error2);
+    error: function error(_error3) {
+      console.error(_error3);
       response.error("An error occurred while looking up this user's installations.");
     }
   });

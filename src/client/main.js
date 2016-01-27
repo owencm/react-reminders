@@ -1,13 +1,3 @@
-import Parse from 'parse';
-
-Parse.initialize('ZqfKAmPjdMdNkzJV4ZAGZC2odz2BPjTaIlJRBeOF', 'e2VWvnFULHByDWnywBemHM4JhvKHmdrEuuKvtBJw');
-
-window.Parse = Parse;
-
-Parse.Cloud.run('hello', {}).then((result) => {
-  console.log(result);
-});
-
 // TODO: resubscribe every time the page is loaded if we still have permission
 
 import React from 'react';
