@@ -1,7 +1,7 @@
 // TODO: in initialization take an sender ID and add it to the sites manifest
 // using the service worker
 
-import Parse from 'parse';
+import Parse from 'parse/node';
 
 Parse.initialize('ZqfKAmPjdMdNkzJV4ZAGZC2odz2BPjTaIlJRBeOF', 'e2VWvnFULHByDWnywBemHM4JhvKHmdrEuuKvtBJw');
 window.Parse = Parse;
@@ -29,17 +29,7 @@ const subscribeWithParse = (deviceToken) => {
   });
 }
 
-pushWrapper.getSubscription().then((subscription) => {
-  if (subscription) {
-    let endpoint = subscription.endpoint;
-    let deviceToken = endpoint.slice(40, endpoint.length);
-    subscribeWithParse(deviceToken);
-  }
-});
-
 let queue = [];
-
-pushWrapper.addSubscriptionChangeListener(flushQueue);
 
 const flushQueueIfSubscriptionAvailable = () => {
   pushWrapper.getSubscription().then((subscription) => {
@@ -91,6 +81,22 @@ const flushQueue = ({ endpoint }) => {
   queue = [];
 }
 
+pushWrapper.addSubscriptionChangeListener((subscription) => {
+  flushQueue(subscription);
+  let endpoint = subscription.endpoint;
+  let deviceToken = endpoint.slice(40, endpoint.length);
+  subscribeWithParse(deviceToken);
+});
+
+// TODO: Tidy this all up
+pushWrapper.getSubscription().then((subscription) => {
+  if (subscription) {
+    let endpoint = subscription.endpoint;
+    let deviceToken = endpoint.slice(40, endpoint.length);
+    subscribeWithParse(deviceToken);
+  }
+});
+
 const set = (tag, targetTime, interval=-1, data) => {
   // Note the subscription ID gets added when the queue is flushed
   addToQueue({
@@ -127,5 +133,3 @@ const requestPermission = pushWrapper.subscribeDevice;
 const hasPermission = pushWrapper.hasPermission;
 
 module.exports = { set, unset, init, requestPermission, hasPermission };
-
-pushWrapper.getSubscription().then((sub) => { console.log(sub) });
