@@ -4,25 +4,24 @@
 import { getDeviceId } from './device-id.js';
 import pushWrapper from './push-wrapper.js';
 
+let key;
 let queuedRequests = [];
 
-let flushQueueIfSubscriptionAvailable = (subscription) => {
-  flushQueue(subscription.endpoint);
+let flushQueueIfSubscriptionAvailable = () => {
+  pushWrapper.getSubscription().then((subscription) => {
+    if (subscription) {
+      flushQueue(subscription.endpoint);
+    }
+  });
 }
 
 pushWrapper.addSubscriptionChangeListener(flushQueueIfSubscriptionAvailable);
-
-pushWrapper.getSubscription().then((subscription) => {
-  if (subscription) {
-    flushQueueIfSubscriptionAvailable(subscription.endpoint);
-  }
-});
-
 pushWrapper.hasPermission().then((permissionGranted) => {
   if (permissionGranted) {
     pushWrapper.subscribeDevice();
   }
 });
+flushQueueIfSubscriptionAvailable();
 
 // These will be sent when flushQueue is called, and they will have subscription
 // added to body
@@ -81,7 +80,8 @@ const unset = (tag) => {
   });
 }
 
-const init = () => {
+const init = (aPIKey) => {
+  key = aPIKey;
   // TODO: dim the screen at this point
   pushWrapper.hasPermission().then((permissionEnabled) => {
     if (permissionEnabled) {

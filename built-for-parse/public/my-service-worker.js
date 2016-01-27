@@ -3005,8 +3005,8 @@ var _alarmManagerSw2 = _interopRequireDefault(_alarmManagerSw);
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 _alarmManagerSw2.default.addListener(function (data) {
-    var title = data.title;
-    var body = data.body;
+    var title = data.title || 'Aspire';
+    var body = data.body || 'Add a new aspiration today';
     var notificationOptions = {
         body: body,
         icon: 'icon.png',

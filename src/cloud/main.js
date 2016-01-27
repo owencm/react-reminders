@@ -1,6 +1,62 @@
+let log = (...msgs) => {
+  console.log(msgs.map(JSON.stringify).join(' '));
+}
 
-// Use Parse.Cloud.define to define as many cloud functions as you want.
-// For example:
-Parse.Cloud.define("hello", function(request, response) {
-  response.success("Hello world!");
+Parse.Cloud.define('scheduleNotification', (req, resp) => {
+  let { startTime, data } = req.params;
+  // log(req.body);
+  log('Scheduling a notification in response to ', req.body, 'to be shown at', startTime, 'and include', data);
+  // TODO: write data somewhere
+  // TODO: Schedule a notification
+  // Parse.Push.send({
+  //   data: {
+  //     alert: "This is my first push"
+  //   }
+  // }, {
+  //   success: function() {
+  //     // Push was successful
+  //   },
+  //   error: function(error) {
+  //     // Handle error
+  //   }
+  // });
+  resp.success();
+});
+
+Parse.Cloud.define('setDeviceToken', (req, resp) => {
+  let { deviceToken, userId } = req.params;
+  Parse.Cloud.useMasterKey('tc5jozG8ZZZPbR1wFFNKDrAqnYejEqjMEIFVx2Ik');
+  let user = new Parse.User();
+  user.id = userId;
+  let query = new Parse.Query(Parse.Installation);
+    query.equalTo('user', user); // Match Installations with a pointer to this User
+    query.find({
+      success: (installations) => {
+        for (let i = 0; i < installations.length; ++i) {
+          // Add the channel to all the installations for this user
+          installations[i].set('deviceToken', deviceToken)
+        }
+
+        // Save all the installations
+        Parse.Object.saveAll(installations, {
+          success: (installations) => {
+            // All the installations were saved.
+            response.success("All the installations were updated with new deviceTokens.");
+          },
+          error: (error) => {
+            // An error occurred while saving one of the objects.
+            console.error(error);
+            response.error("An error occurred while updating this user's installations.")
+          },
+        });
+      },
+      error: (error) => {
+        console.error(error);
+        response.error("An error occurred while looking up this user's installations.")
+      }
+    });
+});
+
+Parse.Cloud.job('cronNotificationScheduler', (req, status) => {
+  status.success('Job says Hello World!');
 });

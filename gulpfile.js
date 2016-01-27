@@ -69,5 +69,6 @@ gulp.task('default', function () {
 
 gulp.task('watch', function () {
   gulp.run('default');
-  gulp.watch(path.join(srcDir, '**/*'), ['default']);
+  gulp.watch(path.join(cloudSrcDir, '**/*'), ['build-cloud']);
+  gulp.watch(path.join(clientSrcDir, '**/*'), ['build-client']);
 });

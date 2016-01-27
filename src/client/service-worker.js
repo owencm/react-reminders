@@ -3,8 +3,8 @@
 import alarmManagerSw from './lib/alarm-manager-sw.js';
 
 alarmManagerSw.addListener((data) => {
-  const title = data.title;
-  const body = data.body;
+  const title = data.title || 'Aspire';
+  const body = data.body || 'Add a new aspiration today';
   const notificationOptions = {
       body: body,
       icon: 'icon.png',

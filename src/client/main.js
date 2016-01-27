@@ -1,4 +1,10 @@
-Parse.Cloud.Run('hello', {}).then((result) => {
+import Parse from 'parse';
+
+Parse.initialize('ZqfKAmPjdMdNkzJV4ZAGZC2odz2BPjTaIlJRBeOF', 'e2VWvnFULHByDWnywBemHM4JhvKHmdrEuuKvtBJw');
+
+window.Parse = Parse;
+
+Parse.Cloud.run('hello', {}).then((result) => {
   console.log(result);
 });
 
