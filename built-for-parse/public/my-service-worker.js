@@ -2933,39 +2933,9 @@ process.umask = function() { return 0; };
 },{}],3:[function(require,module,exports){
 'use strict';
 
-var _deviceId = require('./device-id.js');
+var _urlEncode = require('./url-encode.js');
 
-var listeners = [];
-
-var addListener = function addListener(callback) {
-  listeners.push(callback);
-};
-
-var notifyListeners = function notifyListeners(data) {
-  listeners.map(function (listener) {
-    return listener(data);
-  });
-};
-
-self.addEventListener('push', function (event) {
-  console.log('Received a push message', event);
-  (0, _deviceId.getDeviceId)().then(function (deviceId) {
-    return fetch('v1/get/' + deviceId);
-  }).then(function (resp) {
-    if (resp.status !== 200) {
-      throw new Error('Could not ping alarm server');
-    }
-    return resp.json();
-  }).then(function (data) {
-    console.log('Received data from server', data);
-    notifyListeners(data);
-  });
-});
-
-module.exports = { addListener: addListener };
-
-},{"./device-id.js":4}],4:[function(require,module,exports){
-'use strict';
+var _urlEncode2 = _interopRequireDefault(_urlEncode);
 
 var _localforage = require('localforage');
 
@@ -2975,27 +2945,96 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 var lf = _localforage2.default;
 
-var getDeviceId = function getDeviceId() {
-  return lf.ready().then(function () {
-    return lf.getItem('deviceId');
-  }).then(function (id) {
-    // If we've never created one before, create it and return it
-    if (id === null) {
-      (function () {
-        var randId = Math.random() + '';
-        lf.setItem('deviceId', randId).then(function () {
-          return randId;
-        });
-      })();
-    } else {
-      return lf.getItem('deviceId');
-    }
+// Parse Metadata
+// TODO: Move these somewhere central
+var appId = 'ZqfKAmPjdMdNkzJV4ZAGZC2odz2BPjTaIlJRBeOF';
+// TODO: this is supposed to be secret so use the JS key instead
+var restAPIKey = 'AQzcxaea2zWLoqj9EDVyH7D6Poe4k87Tu9W96mH9';
+var JSAPIKey = 'e2VWvnFULHByDWnywBemHM4JhvKHmdrEuuKvtBJw';
+
+var listeners = [];
+
+// Listeners must return a promise when called
+var addListener = function addListener(callback) {
+  listeners.push(callback);
+};
+
+var notifyListeners = function notifyListeners(data) {
+  return Promise.all(listeners.map(function (listener) {
+    return listener(data);
+  }));
+};
+
+var getPushData = function getPushData() {
+  // This is the actual query I want, but can't use because the Parse SDK
+  // depends on localstorage and doesn't work in service workers
+  //
+  // return Parse._getInstallationId().then((installationId) => {
+  //   const scheduledPushQuery = new Parse.Query('PushData')
+  //     .equalTo('installationId', installationId)
+  //     .lessThan('targetDeliveryTime', now).equalTo('displayed', false)
+  //     .ascending('targetDeliveryTime').first();
+  //   return scheduledPushQuery;
+  // })
+  //
+
+  return lf.getItem('installationId').then(function (installationId) {
+    var className = 'PushData';
+    var urlEncodedQuery = (0, _urlEncode2.default)({
+      where: {
+        'installationId': installationId
+      }
+    });
+    var request = new Request('https://api.parse.com/1/classes/' + className + '?' + urlEncodedQuery, {
+      method: 'GET',
+      headers: {
+        'X-Parse-Application-Id': appId,
+        'X-Parse-REST-API-Key': restAPIKey,
+        'Content-Type': 'application/json'
+      }
+    });
+    // TODO: Error handling
+    return fetch(request).then(function (response) {
+      return response.json();
+    }).then(function (data) {
+      console.log(data);
+      // Note we limit to 1 in the query so it's safe to fetch only
+      // the 0th entry
+      return data.results[0].data;
+    });
+    // TODO: Mark notifications as received
+    // .then((pushData) => {
+    //   pushData.set('received', true);
+    //   pushData.save();
+    //   return pushData.data;
+    // });
   });
 };
 
-module.exports = { getDeviceId: getDeviceId };
+self.addEventListener('push', function (event) {
+  event.waitUntil(getPushData().then(function (data) {
+    return notifyListeners(data);
+  }));
+});
 
-},{"localforage":1}],5:[function(require,module,exports){
+module.exports = { addListener: addListener };
+
+},{"./url-encode.js":4,"localforage":1}],4:[function(require,module,exports){
+'use strict';
+
+// Format {where: {a: b}, {limit: 1}} becomes where={a:b}&limit=1, but escaped
+// This is pretty damn ugly, but gets the job done. Note that each entry in
+var urlEncode = function urlEncode(obj) {
+  var list = [];
+  for (var key in obj) {
+    list.push(key + '=' + escape(JSON.stringify(obj[key])));
+  }
+  return list.join('&');
+};
+
+module.exports = urlEncode;
+
+},{}],5:[function(require,module,exports){
 'use strict';
 
 var _alarmManagerSw = require('./lib/alarm-manager-sw.js');
@@ -3005,6 +3044,7 @@ var _alarmManagerSw2 = _interopRequireDefault(_alarmManagerSw);
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 _alarmManagerSw2.default.addListener(function (data) {
+    console.log('Received data from alarm manager', data);
     var title = data.title || 'Aspire';
     var body = data.body || 'Add a new aspiration today';
     var notificationOptions = {

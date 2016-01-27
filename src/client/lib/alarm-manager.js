@@ -8,12 +8,6 @@ window.Parse = Parse;
 
 import pushWrapper from './push-wrapper.js';
 
-Parse.Cloud.run('scheduleNotification', {}).then((result) => {
-  console.log(result);
-});
-
-
-
 import localforage from 'localforage';
 const lf = localforage;
 
@@ -43,63 +37,81 @@ pushWrapper.getSubscription().then((subscription) => {
   }
 });
 
-// let queue = [];
-//
-// pushWrapper.addSubscriptionChangeListener(flushQueue);
-//
-// const flushQueueIfSubscriptionAvailable = () => {
-//   pushWrapper.getSubscription().then((subscription) => {
-//     if (subscription) {
-//       flushQueue(subscription);
-//     }
-//   });
-// }
-//
-// flushQueueIfSubscriptionAvailable();
-//
-// pushWrapper.hasPermission().then((permissionGranted) => {
-//   if (permissionGranted) {
-//     pushWrapper.subscribeDevice();
-//   }
-// });
-//
-// // These will be sent when flushQueue is called, and they will have subscription
-// // added to body
-// // TODO: clobber queued requests with the same tag
-// const addToQueue = (body) => {
-//   queue.push(body);
-//   flushQueueIfSubscriptionAvailable();
-// }
-//
-// const flushQueue = ({ endpoint }) => {
-//   for (let i = 0; i < queue.length; i++) {
-//     let task = queue[i];
-//
-//   }
-//   queue = [];
-// }
-//
-// const set = (tag, targetTime, interval, data) => {
-//   // Note the subscription ID gets added when the queue is flushed
-//   addToQueue({
-//     action: 'set',
-//     tag,
-//     targetTime,
-//     interval,
-//     data
-//   });
-// }
-//
-// const unset = (tag) => {
-//   // Send to the server scheduling information, keyed by a device ID and the todo ID
-//   // so if the todo changes we can clear the previous schedule on the server
-//   // Note the subscription ID gets added when the queue is flushed
-//   addToQueue({
-//     action: 'unset',
-//     tag,
-//     deviceId
-//   });
-// }
+let queue = [];
+
+pushWrapper.addSubscriptionChangeListener(flushQueue);
+
+const flushQueueIfSubscriptionAvailable = () => {
+  pushWrapper.getSubscription().then((subscription) => {
+    if (subscription) {
+      flushQueue(subscription);
+    }
+  });
+}
+
+flushQueueIfSubscriptionAvailable();
+
+pushWrapper.hasPermission().then((permissionGranted) => {
+  if (permissionGranted) {
+    pushWrapper.subscribeDevice();
+  }
+});
+
+// These will be sent when flushQueue is called, and they will have subscription
+// added to body
+const addToQueue = (newTask) => {
+  // Clear tasks from the queue if they have the same taga
+  queue = queue.filter((task) => {
+    return task.tag !== newTask.tag;
+  })
+  queue.push(newTask);
+  flushQueueIfSubscriptionAvailable();
+}
+
+const flushQueue = ({ endpoint }) => {
+  for (let i = 0; i < queue.length; i++) {
+    let task = queue[i];
+    if (task.action === 'unset') {
+      // TODO
+    } else {
+      // TODO: Write data to somewhere we can get to it
+      Parse._getInstallationId().then((installationId) => {
+        let pushData = new Parse.Object('PushData', {
+          tag: task.tag,
+          data: task.data,
+          targetDeliveryTime: task.targetTime,
+          installationId: installationId,
+          delivered: false,
+          received: false
+        });
+        pushData.save();
+      });
+    }
+  }
+  queue = [];
+}
+
+const set = (tag, targetTime, interval=-1, data) => {
+  // Note the subscription ID gets added when the queue is flushed
+  addToQueue({
+    action: 'set',
+    tag,
+    targetTime,
+    interval,
+    data
+  });
+}
+
+const unset = (tag) => {
+  // Send to the server scheduling information, keyed by a device ID and the todo ID
+  // so if the todo changes we can clear the previous schedule on the server
+  // Note the subscription ID gets added when the queue is flushed
+  addToQueue({
+    action: 'unset',
+    tag,
+    deviceId
+  });
+}
 
 const init = () => {
   // TODO: dim the screen at this point
